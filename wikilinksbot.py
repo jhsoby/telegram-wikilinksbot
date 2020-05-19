@@ -13,16 +13,16 @@ def labelfetcher(item):
     """
     if item[0] in ["P", "Q"]:
         with urllib.request.urlopen("https://www.wikidata.org/w/api.php?action=wbgetentities&languages=en&props=labels&format=json&ids=" + item) as url:
-            data = json.loads(url.read())
+            data = json.loads(url.read().decode())
             try:
-                # TODO: Make the language fetched configurable for each group
+                # TODO: Make the language fetched configurable for each Telegram group
                 label = data["entities"][item]["labels"]["en"]["value"]
                 return label
             except:
                 return False
     if item[0] == "L":
         with urllib.request.urlopen("https://www.wikidata.org/w/api.php?action=wbgetentities&props=info&format=json&ids=" + item) as url:
-            data = json.loads(url.read())
+            data = json.loads(url.read().decode())
             try:
                 for lang in data["entities"][item]["lemmas"]:
                     lemma = data["entities"][item]["lemmas"][lang]["value"]
@@ -80,7 +80,9 @@ def linker(messagetext):
     linklist = re.findall(r'(\[\[.+?[\||\]]|(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema)(?<!title=)[QPLE]\d+)', messagetext)
     fmt_linklist = []
     for link in linklist:
-        fmt_linklist.append(linkformatter(link))
+        link = linkformatter(link)
+        if not link in fmt_linklist:
+            fmt_linklist.append(link)
     return "\n".join(fmt_linklist)
 
 def link(update, context):
