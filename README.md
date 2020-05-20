@@ -21,7 +21,7 @@ The commands can only be used by group administrators or bot maintainers, in ord
 
 This command is used for changing the URL links point to. The default is [https://en.wikipedia.org/](https://en.wikipedia.org/) for [[normal links]] and [https://www.wikidata.org/](https://www.wikidata.org/) for Wikibase links. You can link other wikis like you would on-wiki using normal Wikimedia prefixes (e.g. [\[\[c:Special:UploadWizard\]\]](https://commons.wikimedia.org/wiki/Special:UploadWizard) or [\[\[de:Schadenfreude\]\]](https://de.wikipedia.org/wiki/Schadenfreude)).
 
-URLs are assumed to follow the standar Wikimedia naming scheme where pages are found at https://URL/wiki/_page_ and the API is accessed at https://URL/w/api.php.
+URLs are assumed to follow the standard Wikimedia naming scheme where pages are found at https://URL/wiki/_page_ and the API is accessed at https://URL/w/api.php.
 
 #### Change the language used for Wikidata labels
 ```
