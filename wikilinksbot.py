@@ -73,7 +73,7 @@ def linkformatter(link, conf):
         "Q": "",
         "P": "Property:",
         "L": "Lexeme:",
-        "E": "EntitySchema"
+        "E": "EntitySchema:"
     }
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]:
         link = re.sub(r"[\[\]\|]", "", display)
