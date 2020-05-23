@@ -4,6 +4,8 @@ import urllib.request, json
 import re
 import bot_config
 updater = Updater(bot_config.token, use_context=True)
+# The main regex we use to find linkable terms in messages
+regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)([QPE][1-9]\d*(#P\d+)?|L[1-9]\d*(-[SF]\d+)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata "
@@ -51,6 +53,8 @@ def labelfetcher(item, lang, wb):
     the lemma and language code for lexemes.
     Returns False if there is no label.
     """
+    if not item:
+        return False
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + lang + "|en&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
@@ -62,7 +66,7 @@ def labelfetcher(item, lang, wb):
                 return label
             except:
                 return False
-    if item[0] == "L": # Is the item a lexeme?
+    elif item[0] == "L": # Is the item a lexeme?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=info&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
             try:
@@ -73,15 +77,24 @@ def labelfetcher(item, lang, wb):
                     return label
             except:
                 return False
+    return False
 
 def linkformatter(link, conf):
     """
     Formats a single link in the correct way.
     """
+    section = False
     display = link
     url = link
     formatted = "<a href='{0}'>{1}</a> {2}"
-    label = False
+    if re.match(r"[QLP]\d+#P\d+", link):
+        link, section = link.split("#")
+    elif re.match(r"L\d+-[SF]\d+", link):
+        link, section = link.split("-")
+        display = link + "-" + section
+        url = link + "#" + section
+    linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"])
+    sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"]) or section)
     prefixes = {
         "Q": "",
         "P": "Property:",
@@ -94,10 +107,11 @@ def linkformatter(link, conf):
         url = conf["normallinks"] + "wiki/" + link.replace(" ", "_")
         return formatted.format(url, display, "")
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]:
-        url = conf["wikibaselinks"] + "wiki/" + prefixes[link[0]] + display
-        label = labelfetcher(link, conf["language"], conf["wikibaselinks"])
-        if label:
-            return formatted.format(url, display, "– " + label)
+        url = conf["wikibaselinks"] + "wiki/" + prefixes[link[0]] + url
+        if section:
+            linklabel = linklabel + " → " + sectionlabel
+        if linklabel:
+            return formatted.format(url, display, "– " + linklabel)
         else:
             return formatted.format(url, display, "")
     else:
@@ -111,10 +125,10 @@ def link(update, context):
     and entity schemas. It will however _not_ post a link when the entity is
     mentioned as part of a URL.
     """
-    linklist = re.findall(r'(\[\[.+?[\||\]]|(?<!\w)(?<!\w=)(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)[QPLE][1-9]\d*)', update.message.text)
+    linklist = re.findall(regex, update.message.text)
     fmt_linklist = []
     for link in linklist:
-        link = linkformatter(link, getconfig(update.effective_chat.id))
+        link = linkformatter(link[0], getconfig(update.effective_chat.id))
         if link and (not link in fmt_linklist):
             fmt_linklist.append(link)
     if len(fmt_linklist) > 0:
@@ -232,9 +246,8 @@ def start(update, context):
 #echo_handler = CommandHandler('echo', echo)
 #updater.dispatcher.add_handler(echo_handler)
 
-# Same regex as above in the function "link"; if there are hits on this regex, the bot knows that it
-# needs to do something.
-link_handler = MessageHandler(Filters.regex(r'(\[\[.+?[\||\]]|(?<!\w)(?<!\w=)(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)[QPLE][1-9]\d*)'), link)
+
+link_handler = MessageHandler(Filters.regex(regex), link)
 config_handler = CommandHandler(['setwiki', 'setlang', 'toggle'], config)
 start_handler = CommandHandler(['start', 'help'], start)
 
