@@ -6,6 +6,19 @@ import bot_config
 updater = Updater(bot_config.token, use_context=True)
 
 messages = {
+    "start-group": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata "
+              "entities when they are used in chats. You can "
+              "<a href='https://t.me/wikilinksbot'>start a private chat with me</a> "
+              "to test me out and learn about how I can be configured."),
+    "start-private": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata entities "
+                      "when they are used in chats. I have the following configuration options, "
+                      "try any of them here to see how they work:\n\n"
+                      "/setwiki - Change which wiki links point to\n"
+                      "/setlang - Change which language to use for Wikidata labels\n"
+                      "/toggle - Turn the two link types on or off\n\n"
+                      "My source code and documentation is available "
+                      "<a href='https://github.com/jhsoby/wikilinksbot'>on GitHub</a> – "
+                      "Feel free to report any issues you may have with me there! 😊"),
     "setwiki_success": "✅ The URL for {0} has been updated to {1} for this chat.",
     "setwiki_error": ("The format for the /setwiki command is:\n"
                  "<code>/setwiki (normallinks|wikibaselinks) https://$URL/</code>\n\n"
@@ -98,7 +111,7 @@ def link(update, context):
     and entity schemas. It will however _not_ post a link when the entity is
     mentioned as part of a URL.
     """
-    linklist = re.findall(r'(\[\[.+?[\||\]]|(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)[QPLE][1-9]\d*)', update.message.text)
+    linklist = re.findall(r'(\[\[.+?[\||\]]|(?<!\w)(?<!\w=)(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)[QPLE][1-9]\d*)', update.message.text)
     fmt_linklist = []
     for link in linklist:
         link = linkformatter(link, getconfig(update.effective_chat.id))
@@ -202,15 +215,31 @@ def config(update, context):
         errortext = messages[command[1:] + "_error"]
         update.message.reply_text(text=errortext, parse_mode="html")
 
-# Same regex as above in the function "link"; if there are hits on this regex,
-# the bot knows that it needs to do something.
-link_handler = MessageHandler(Filters.regex(r'(\[\[.+?[\||\]]|(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)[QPLE][1-9]\d*)'), link)
-setwiki_handler = CommandHandler('setwiki', config)
-setlang_handler = CommandHandler('setlang', config)
-toggle_handler = CommandHandler('toggle', config)
+def start(update, context):
+    """
+    Start command that should be part of every Telegram bot.
+    Also used for the /help command.
+    """
+    message = "start-group"
+    if update.effective_chat.type == "private":
+        message = "start-private"
+    context.bot.send_message(chat_id=update.effective_chat.id, text=messages[message], parse_mode="html", disable_web_page_preview=True)
+
+# Function used when testing changes to the bot. Uncomment to enable.
+#def echo(update, context):
+#    print(update.effective_chat.type)
+#    context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
+#echo_handler = CommandHandler('echo', echo)
+#updater.dispatcher.add_handler(echo_handler)
+
+# Same regex as above in the function "link"; if there are hits on this regex, the bot knows that it
+# needs to do something.
+link_handler = MessageHandler(Filters.regex(r'(\[\[.+?[\||\]]|(?<!\w)(?<!\w=)(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)[QPLE][1-9]\d*)'), link)
+config_handler = CommandHandler(['setwiki', 'setlang', 'toggle'], config)
+start_handler = CommandHandler(['start', 'help'], start)
 
 updater.dispatcher.add_handler(link_handler)
-updater.dispatcher.add_handler(setwiki_handler)
-updater.dispatcher.add_handler(setlang_handler)
-updater.dispatcher.add_handler(toggle_handler)
+updater.dispatcher.add_handler(config_handler)
+updater.dispatcher.add_handler(start_handler)
 updater.start_polling()
+updater.idle()
