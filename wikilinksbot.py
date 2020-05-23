@@ -58,12 +58,25 @@ def labelfetcher(item, lang, wb):
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + lang + "|en&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
+            sep = "–"
+            if item[0] == "Q":
+                with urllib.request.urlopen(wb + "w/api.php?action=wbgetclaims&entity=" + item + "&property=P487&format=json") as emoji:
+                    emojidata = json.loads(emoji.read().decode())
+                    if "claims" in emojidata:
+                        if "P487" in emojidata["claims"]:
+                            if emojidata["claims"]["P487"][0]["mainsnak"]["snaktype"] == "value":
+                                sep = emojidata["claims"]["P487"][0]["mainsnak"]["datavalue"]["value"]
             try:
                 if lang in data["entities"][item]["labels"]:
                     label = data["entities"][item]["labels"][lang]["value"]
+                    if label == sep:
+                        sep = "–"
                 else:
-                    label = data["entities"][item]["labels"]["en"]["value"] + " [<code>en</code>]"
-                return label
+                    label = data["entities"][item]["labels"]["en"]["value"]
+                    if label == sep:
+                        sep = "–"
+                    label = label + " [<code>en</code>]"
+                return sep + " " + label
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
@@ -111,7 +124,7 @@ def linkformatter(link, conf):
         if section:
             linklabel = linklabel + " → " + sectionlabel
         if linklabel:
-            return formatted.format(url, display, "– " + linklabel)
+            return formatted.format(url, display, linklabel)
         else:
             return formatted.format(url, display, "")
     else:
