@@ -92,6 +92,21 @@ def labelfetcher(item, lang, wb, sep_override="–"):
                 return False
     return False
 
+def resolveredirect(link, url):
+    """
+    Checks [[normal links]] for whether or not they are redirects, and gets
+    the target title for the redirect page.
+    """
+    target = link
+    with urllib.request.urlopen(url + "w/api.php?action=query&titles=" + link + "&redirects=1&format=json") as apiresult:
+        api = json.loads(apiresult.read().decode())["query"]
+        if "redirects" in api:
+            target = api["redirects"][0]["to"]
+    if link == target:
+        return False
+    else:
+        return target
+
 def linkformatter(link, conf):
     """
     Formats a single link in the correct way.
@@ -117,9 +132,14 @@ def linkformatter(link, conf):
     }
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]:
         link = re.sub(r"[\[\]\|]", "", display)
-        display = "&#91;&#91;" + link + "&#93;&#93;"
+        display = "&#91;"*2 + link + "&#93;"*2
         url = conf["normallinks"] + "wiki/" + link.replace(" ", "_")
-        return formatted.format(url, display, "")
+        redirect = resolveredirect(link, conf["normallinks"])
+        if redirect:
+            url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_")
+            return formatted.format(url, display, "⮡ " + redirect)
+        else:
+            return formatted.format(url, display, "")
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]:
         url = conf["wikibaselinks"] + "wiki/" + prefixes[link[0]] + url
         if section:
@@ -271,5 +291,8 @@ start_handler = CommandHandler(['start', 'help'], start)
 updater.dispatcher.add_handler(link_handler)
 updater.dispatcher.add_handler(config_handler)
 updater.dispatcher.add_handler(start_handler)
-updater.start_polling()
-updater.idle()
+try:
+    updater.start_polling()
+    updater.idle()
+except KeyboardInterrupt:
+    updater.stop()
