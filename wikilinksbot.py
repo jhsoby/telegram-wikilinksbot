@@ -46,7 +46,7 @@ messages = {
                  "chat. Only group administrators or the bot's maintainers may change the configuration.")
 }
 
-def labelfetcher(item, lang, wb):
+def labelfetcher(item, lang, wb, sep_override="–"):
     """
     Gets the label from the Wikidata items/properties in question, in the
     language set in the configuration, with a fallback to English, or gets
@@ -58,7 +58,7 @@ def labelfetcher(item, lang, wb):
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + lang + "|en&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
-            sep = "–"
+            sep = sep_override
             if item[0] == "Q":
                 with urllib.request.urlopen(wb + "w/api.php?action=wbgetclaims&entity=" + item + "&property=P487&format=json") as emoji:
                     emojidata = json.loads(emoji.read().decode())
@@ -70,11 +70,11 @@ def labelfetcher(item, lang, wb):
                 if lang in data["entities"][item]["labels"]:
                     label = data["entities"][item]["labels"][lang]["value"]
                     if label == sep:
-                        sep = "–"
+                        sep = sep_override
                 else:
                     label = data["entities"][item]["labels"]["en"]["value"]
                     if label == sep:
-                        sep = "–"
+                        sep = sep_override
                     label = label + " [<code>en</code>]"
                 return sep + " " + label
             except:
@@ -107,7 +107,7 @@ def linkformatter(link, conf):
         display = link + "-" + section
         url = link + "#" + section
     linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"])
-    sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"]) or section)
+    sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
     prefixes = {
         "Q": "",
         "P": "Property:",
@@ -122,7 +122,7 @@ def linkformatter(link, conf):
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]:
         url = conf["wikibaselinks"] + "wiki/" + prefixes[link[0]] + url
         if section:
-            linklabel = linklabel + " → " + sectionlabel
+            linklabel = linklabel + sectionlabel
         if linklabel:
             return formatted.format(url, display, linklabel)
         else:
