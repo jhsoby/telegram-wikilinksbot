@@ -5,7 +5,7 @@ import re
 import bot_config
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)([QPE][1-9]\d*(#P\d+)?|L[1-9]\d*(-[SF]\d+)?))")
+regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLE][1-9]\d*(#P\d+)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata "
@@ -107,7 +107,8 @@ def linkformatter(link, conf):
         display = link + "-" + section
         url = link + "#" + section
     linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"])
-    sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
+    if section:
+        sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
     prefixes = {
         "Q": "",
         "P": "Property:",
@@ -122,7 +123,10 @@ def linkformatter(link, conf):
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]:
         url = conf["wikibaselinks"] + "wiki/" + prefixes[link[0]] + url
         if section:
-            linklabel = linklabel + sectionlabel
+            if linklabel:
+                linklabel += sectionlabel
+            else:
+                linklabel = sectionlabel
         if linklabel:
             return formatted.format(url, display, linklabel)
         else:
