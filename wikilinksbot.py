@@ -11,13 +11,16 @@ messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata "
             "entities when they are used in chats. You can "
             "<a href='https://t.me/wikilinksbot'>start a private chat with me</a> "
-            "to test me out and learn about how I can be configured."),
+            "to test me out and learn about how I can be configured. If you don't "
+            "like one of my messages, reply to it with <code>/delete</code>."),
     "start-private": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata entities "
             "when they are used in chats. I have the following configuration options, "
             "try any of them here to see how they work:\n\n"
             "/setwiki - Change which wiki links point to\n"
             "/setlang - Change which language to use for Wikidata labels\n"
             "/toggle - Turn the two link types on or off\n\n"
+            "If you don't like one of my messages, reply to it with <code>/delete</code>, "
+            "and I will delete it.\n\n"
             "My source code and documentation is available "
             "<a href='https://github.com/jhsoby/wikilinksbot'>on GitHub</a> – "
             "Feel free to report any issues you may have with me there! 😊"),
@@ -33,7 +36,7 @@ messages = {
             "<code>/toggle (normallinks|wikibaselinks) (on|off)</code>\n\n"
             "By default both are turned on. If both are turned off, the bot will "
             "in effect be disabled."),
-    "setlang_success": "✅ The languages used for labels have now been changed to <code>{0}</code>.",
+    "setlang_success": "✅ The language priority list for labels has now been changed to <code>{0}</code>.",
     "setlang_error": ("The format for the /setlang command is:\n"
             "<code>/setlang language_code</code>\n\n"
             "The language code must be one that is in use in Wikidata, "
@@ -45,10 +48,12 @@ messages = {
             "<a href='https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages'>in "
             "the API</a>."),
     "setlang_invalid": ("<b>Error:</b> The language code <code>{0}</code> does not look like a valid "
-                        "language code. Please fix it and try again.\n\n"),
+            "language code. Please fix it and try again.\n\n"),
     "config_error": "Invalid use of the <code>{}</code> command. Use /help for a list of commands for this bot and how to use them.",
     "permission_error": ("⛔️ Sorry, you do not have permission to change the bot configuration in this "
-                 "chat. Only group administrators or the bot's maintainers may change the configuration.")
+            "chat. Only group administrators or the bot's maintainers may change the configuration."),
+    "delete_error": ("There's nothing I can delete. <b>Reply</b> to any of my messages "
+            "(including this one) with <code>/delete</code> to delete that message.")
 }
 
 def labelfetcher(item, languages, wb, sep_override="–"):
@@ -276,6 +281,18 @@ def config(update, context):
         errortext = messages[command[1:] + "_error"]
         update.message.reply_text(text=errortext, parse_mode="html")
 
+def delete(update, context):
+    """
+    Delete a message if a user asks for it.
+    """
+    # Check if the message is a reply, and that the message being replied
+    # to is sent by this bot.
+    if update.message.reply_to_message and (context.bot.username == update.message.reply_to_message.from_user.username):
+        context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.reply_to_message.message_id)
+        context.bot.delete_message(chat_id=update.effective_chat.id, message_id=update.message.message_id)
+    else:
+        update.message.reply_html(text=messages["delete_error"])
+
 def start(update, context):
     """
     Start command that should be part of every Telegram bot.
@@ -297,10 +314,12 @@ def start(update, context):
 link_handler = MessageHandler(Filters.regex(regex), link)
 config_handler = CommandHandler(['setwiki', 'setlang', 'toggle'], config)
 start_handler = CommandHandler(['start', 'help'], start)
+delete_handler = CommandHandler('delete', delete)
 
 updater.dispatcher.add_handler(link_handler)
 updater.dispatcher.add_handler(config_handler)
 updater.dispatcher.add_handler(start_handler)
+updater.dispatcher.add_handler(delete_handler)
 try:
     updater.start_polling()
     updater.idle()

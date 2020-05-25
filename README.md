@@ -4,12 +4,19 @@ This is a Python3 script that links [[wiki links]] and Wikidata entities (like [
 
 ## Features
 * Links [[wiki links]] and Wikidata entities mentioned in chat messages
+* Can delete its own messages when they are replied to with `/delete`
 * Changing the default URLs used for links in one group _(group admins only)_
 * Changing the language used for labels for Wikidata entities _(group admins only)_
 * Toggle which type of link the bot should post _(group admins only)_
 
 ## How to use in a chat
-Add **[@wikilinksbot](t.me/wikilinksbot)** to your group.
+Add **[@wikilinksbot](t.me/wikilinksbot)** to your group, and test it out by sending
+a message with a [[wiki link]] or a Wikidata entity like Q42.
+
+If you don't like one of the messages the bot has sent, you can reply to it with `/delete`,
+and the bot will delete that message. It will also attempt to delete your /delete message,
+but that will only work if the bot is a group admin or you are in a private chat with
+the bot. If that's not the case, you will have to delete that message manually yourself.
 
 ### Group configuration
 The commands can only be used by group administrators or bot maintainers, in order to limit who can change its settings. The exception is if you're in a private chat with the bot, in which case anyone can set any setting.
