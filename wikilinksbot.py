@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
-import urllib.request, json
+import urllib.request, urllib.parse, json
 import re
 import bot_config
 updater = Updater(bot_config.token, use_context=True)
@@ -9,44 +9,49 @@ regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata "
-              "entities when they are used in chats. You can "
-              "<a href='https://t.me/wikilinksbot'>start a private chat with me</a> "
-              "to test me out and learn about how I can be configured."),
+            "entities when they are used in chats. You can "
+            "<a href='https://t.me/wikilinksbot'>start a private chat with me</a> "
+            "to test me out and learn about how I can be configured."),
     "start-private": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata entities "
-                      "when they are used in chats. I have the following configuration options, "
-                      "try any of them here to see how they work:\n\n"
-                      "/setwiki - Change which wiki links point to\n"
-                      "/setlang - Change which language to use for Wikidata labels\n"
-                      "/toggle - Turn the two link types on or off\n\n"
-                      "My source code and documentation is available "
-                      "<a href='https://github.com/jhsoby/wikilinksbot'>on GitHub</a> – "
-                      "Feel free to report any issues you may have with me there! 😊"),
+            "when they are used in chats. I have the following configuration options, "
+            "try any of them here to see how they work:\n\n"
+            "/setwiki - Change which wiki links point to\n"
+            "/setlang - Change which language to use for Wikidata labels\n"
+            "/toggle - Turn the two link types on or off\n\n"
+            "My source code and documentation is available "
+            "<a href='https://github.com/jhsoby/wikilinksbot'>on GitHub</a> – "
+            "Feel free to report any issues you may have with me there! 😊"),
     "setwiki_success": "✅ The URL for {0} has been updated to {1} for this chat.",
     "setwiki_error": ("The format for the /setwiki command is:\n"
-                 "<code>/setwiki (normallinks|wikibaselinks) https://$URL/</code>\n\n"
-                 "The URL must be the base domain for the wiki, and wikis are assumed "
-                 "to follow the Wikimedia convention where content is at <code>$URL/wiki/</code> "
-                 "and the API is available at <code>$URL/w/api.php</code>.\n\n"
-                 "This will change the link settings for this entire chat, so use with caution."),
+            "<code>/setwiki (normallinks|wikibaselinks) https://$URL/</code>\n\n"
+            "The URL must be the base domain for the wiki, and wikis are assumed "
+            "to follow the Wikimedia convention where content is at <code>$URL/wiki/</code> "
+            "and the API is available at <code>$URL/w/api.php</code>.\n\n"
+            "This will change the link settings for this entire chat, so use with caution."),
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
-                 "<code>/toggle (normallinks|wikibaselinks) (on|off)</code>\n\n"
-                 "By default both are turned on. If both are turned off, the bot will "
-                 "in effect be disabled."),
-    "setlang_success": "✅ The language used for labels has now been changed to <code>{0}</code>.",
+            "<code>/toggle (normallinks|wikibaselinks) (on|off)</code>\n\n"
+            "By default both are turned on. If both are turned off, the bot will "
+            "in effect be disabled."),
+    "setlang_success": "✅ The languages used for labels have now been changed to <code>{0}</code>.",
     "setlang_error": ("The format for the /setlang command is:\n"
-                 "<code>/setlang language_code</code>\n\n"
-                 "The language code must be one that is in use in Wikidata, "
-                 "though the bot makes no attempt to validate the language code "
-                 "other than a basic regex to check if it could <i>theoretically</i> "
-                 "be a valid language code.\n\n"
-                 "You can see a list of valid language codes <a href='https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages'>in the API</a>."),
+            "<code>/setlang language_code</code>\n\n"
+            "The language code must be one that is in use in Wikidata, "
+            "though the bot makes no attempt to validate the language code "
+            "other than a basic regex to check if it could <i>theoretically</i> "
+            "be a valid language code. You can also have several languages in preferred order, "
+            "just separate them with the <code>|</code> character (a.k.a. pipe).\n\n"
+            "You can see a list of valid language codes "
+            "<a href='https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages'>in "
+            "the API</a>."),
+    "setlang_invalid": ("<b>Error:</b> The language code <code>{0}</code> does not look like a valid "
+                        "language code. Please fix it and try again.\n\n"),
     "config_error": "Invalid use of the <code>{}</code> command. Use /help for a list of commands for this bot and how to use them.",
     "permission_error": ("⛔️ Sorry, you do not have permission to change the bot configuration in this "
                  "chat. Only group administrators or the bot's maintainers may change the configuration.")
 }
 
-def labelfetcher(item, lang, wb, sep_override="–"):
+def labelfetcher(item, languages, wb, sep_override="–"):
     """
     Gets the label from the Wikidata items/properties in question, in the
     language set in the configuration, with a fallback to English, or gets
@@ -56,7 +61,7 @@ def labelfetcher(item, lang, wb, sep_override="–"):
     if not item:
         return False
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
-        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + lang + "|en&props=labels&format=json&ids=" + item) as url:
+        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + languages + "&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
             sep = sep_override
             if item[0] == "Q":
@@ -67,16 +72,15 @@ def labelfetcher(item, lang, wb, sep_override="–"):
                             if emojidata["claims"]["P487"][0]["mainsnak"]["snaktype"] == "value":
                                 sep = emojidata["claims"]["P487"][0]["mainsnak"]["datavalue"]["value"]
             try:
-                if lang in data["entities"][item]["labels"]:
-                    label = data["entities"][item]["labels"][lang]["value"]
-                    if label == sep:
-                        sep = sep_override
-                else:
-                    label = data["entities"][item]["labels"]["en"]["value"]
-                    if label == sep:
-                        sep = sep_override
-                    label = label + " [<code>en</code>]"
-                return sep + " " + label
+                languages = (languages + "|en").split("|")
+                for lang in languages:
+                    if lang in data["entities"][item]["labels"]:
+                        label = data["entities"][item]["labels"][lang]["value"]
+                        if not lang == languages[0]:
+                            label = label + " [<code>" + lang + "</code>]"
+                        if label == sep:
+                            sep = sep_override
+                        return sep + " " + label
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
@@ -98,7 +102,7 @@ def resolveredirect(link, url):
     the target title for the redirect page.
     """
     target = link
-    with urllib.request.urlopen(url + "w/api.php?action=query&titles=" + link + "&redirects=1&format=json") as apiresult:
+    with urllib.request.urlopen(url + "w/api.php?action=query&titles=" + urllib.parse.quote(link) + "&redirects=1&format=json") as apiresult:
         api = json.loads(apiresult.read().decode())["query"]
         if "redirects" in api:
             target = api["redirects"][0]["to"]
@@ -132,7 +136,7 @@ def linkformatter(link, conf):
     }
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]:
         link = re.sub(r"[\[\]\|]", "", display)
-        display = "&#91;"*2 + link + "&#93;"*2
+        display = "&#91;&#91;" + link + "&#93;&#93;"
         url = conf["normallinks"] + "wiki/" + link.replace(" ", "_")
         redirect = resolveredirect(link, conf["normallinks"])
         if redirect:
@@ -247,21 +251,27 @@ def config(update, context):
         else:
             update.message.reply_text(text=messages["toggle_error"], parse_mode="html")
     elif command == "/setlang" and len(message) >= 2:
-        language = message[1]
-        if re.match(r"^([a-z]{2,3}(-[a-z]+)*?|es-419)$", language):
+        languages = message[1] + "|en"
+        error = False
+        for lang in languages.split("|"):
+            if not re.match(r"^([a-z]{2,3}(-[a-z]+)*?|es-419)$", lang):
+                error = lang
+                break
+        if error != False:
+            errortext = messages["setlang_invalid"].format(error) + messages["setlang_error"]
+            update.message.reply_text(text=errortext, parse_mode="html")
+        else:
             with open("group_settings.json", "r+") as f:
                 settings = json.load(f)
                 if chat_id in settings:
-                    settings[chat_id]["language"] = language
+                    settings[chat_id]["language"] = languages
                 else:
-                    settings[chat_id] = {"language": language}
+                    settings[chat_id] = {"language": languages}
                 f.seek(0)
                 json.dump(settings, f, indent=4)
                 f.truncate()
-            successtext = messages["setlang_success"].format(language)
+            successtext = messages["setlang_success"].format(languages)
             update.message.reply_text(text=successtext, parse_mode="html")
-        else:
-            update.message.reply_text(text=messages["setlang_error"], parse_mode="html")
     else:
         errortext = messages[command[1:] + "_error"]
         update.message.reply_text(text=errortext, parse_mode="html")
