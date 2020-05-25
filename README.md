@@ -23,14 +23,31 @@ This command is used for changing the URL links point to. The default is [https:
 
 URLs are assumed to follow the standard Wikimedia naming scheme where pages are found at https://URL/wiki/_page_ and the API is accessed at https://URL/w/api.php.
 
+**Example:**  
+Set [[normal links]] to link to the Shawiya Wiktionary.
+```
+/setwiki normallinks https://shy.wiktionary.org/
+```
+
 #### Change the language used for Wikidata labels
 ```
 /setlang language-code
+/setlang language-code-1|language-code-2|language-code-3
 ```
 
-This command is used for changing what language Wikidata labels are fetched in. The default is `en` (English). When a different language is used, the bot will use the English label if there is no label in that other language.
+This command is used for changing what language Wikidata labels are fetched in. You can set a number of languages in prioritized order, separated with the pipe character (`|`). English (`en`) is always the last fallback, but it can also be specified before other languages.
 
-For this to work, language codes must be one supported by MediaWiki (see [list in the API](https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages)), but the bot doesn't validate the language code except for a simple regex which checks if it could _theoretically_ be a valid languaged code.
+For this to work, the language code(s) must be supported by MediaWiki (see [list in the API](https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages)), but the bot doesn't validate the language code except for a simple regex which checks if it could _theoretically_ be a valid languaged code.
+
+**Examples:**  
+Set the label language to Persian:
+```
+/setlang fa
+```
+Set the label language order to Norwegian Bokmål, Norwegian Nynorsk, Swedish and Danish:
+```
+/setlang nb|nn|sv|da
+```
 
 #### Toggle link types
 ```
@@ -38,6 +55,12 @@ For this to work, language codes must be one supported by MediaWiki (see [list i
 ```
 
 This command is used to turn on/off one of the link types. If both link types are turned off, the bot is essentially disabled.
+
+**Example:**  
+Disable Wikidata links:
+```
+/toggle wikibaselinks off
+```
 
 ## How to run
 ### Prerequisites
