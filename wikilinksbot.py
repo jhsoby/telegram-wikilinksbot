@@ -2,7 +2,9 @@
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import urllib.request, urllib.parse, json
 import re
+import gc
 import bot_config
+gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
 regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLE][1-9]\d*(#P\d+)?))")
@@ -84,6 +86,10 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                         if not lang == languages[0]:
                             label = label + " [<code>" + lang + "</code>]"
                         if label == sep:
+                            sep = sep_override
+                        elif len(sep) == 1 and ord(sep) < 128:
+                            sep = sep_override
+                        elif re.match(r"\w", sep):
                             sep = sep_override
                         return sep + " " + label
             except:
@@ -303,7 +309,7 @@ def start(update, context):
         message = "start-private"
     context.bot.send_message(chat_id=update.effective_chat.id, text=messages[message], parse_mode="html", disable_web_page_preview=True)
 
-# Function used when testing changes to the bot. Uncomment to enable.
+# Function used when testing changes to the bot with the command /echo. Uncomment to enable.
 #def echo(update, context):
 #    print(update.effective_chat.type)
 #    context.bot.send_message(chat_id=update.effective_chat.id, text=update.message.text)
