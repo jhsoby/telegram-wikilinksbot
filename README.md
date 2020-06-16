@@ -1,9 +1,11 @@
 # Telegram Wikilinksbot
 
-This is a Python3 script that links [[wiki links]] and Wikidata entities (like [Q330574](https://www.wikidata.org/wiki/Q330574), [P31](https://www.wikidata.org/wiki/Property:P31) and [L158582](https://www.wikidata.org/wiki/Lexeme:L158582)) whenever they're used in chats.
+This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q330574](https://www.wikidata.org/wiki/Q330574), [P31](https://www.wikidata.org/wiki/Property:P31) and [L158582](https://www.wikidata.org/wiki/Lexeme:L158582)) or Wikimedia Phabricator tasks (like [T39625](https://phabricator.wikimedia.org/T39625))whenever they're used in chats.
 
 ## Features
-* Links [[wiki links]] and Wikidata entities mentioned in chat messages
+* Links [[wiki links]] mentioned in chat messages
+* Links Wikidata entities mentioned in chat messages
+* Links Phabricator tasks mentioned in chat messages (off by default)
 * Can delete its own messages when they are replied to with `/delete`
 * Changing the default URLs used for links in one group _(group admins only)_
 * Changing the language used for labels for Wikidata entities _(group admins only)_
@@ -58,10 +60,10 @@ Set the label language order to Norwegian Bokmål, Norwegian Nynorsk, Swedish an
 
 #### Toggle link types
 ```
-/toggle (normallinks|wikibaselinks) (on|off)
+/toggle (normallinks|wikibaselinks|phabricator) (on|off)
 ```
 
-This command is used to turn on/off one of the link types. If both link types are turned off, the bot is essentially disabled.
+This command is used to turn on/off one of the link types. If all link types are turned off, the bot is essentially disabled. By default, normal links and Wikibase links are turned on, while Phabricator links are turned off.
 
 **Example:**  
 Disable Wikidata links:

@@ -7,25 +7,28 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLE][1-9]\d*(#P\d+)?))")
+regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLET][1-9]\d*(#P\d+)?))")
 
 messages = {
-    "start-group": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata "
-            "entities when they are used in chats. You can "
+    "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
+            "entities and optionally Phabricator tasks when they are mentioned in chats. You can "
             "<a href='https://t.me/wikilinksbot'>start a private chat with me</a> "
             "to test me out and learn about how I can be configured. If you don't "
             "like one of my messages, reply to it with <code>/delete</code>."),
-    "start-private": ("🤖 Hello! I am a bot that links [[wiki links]] and Wikidata entities "
-            "when they are used in chats. I have the following configuration options, "
+    "start-private": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata entities "
+            "and optionally Phabricator tasks "
+            "when they are mentioned in chats. I have the following configuration options, "
             "try any of them here to see how they work:\n\n"
             "/setwiki - Change which wiki links point to\n"
             "/setlang - Change which language to use for Wikidata labels\n"
-            "/toggle - Turn the two link types on or off\n\n"
+            "/toggle - Turn the link types on or off\n\n"
             "If you don't like one of my messages, reply to it with <code>/delete</code>, "
-            "and I will delete it.\n\n"
+            "and I will delete it. If I'm made administrator in a group, I will delete "
+            "your <code>/delete</code> message as well!\n\n"
             "My source code and documentation is available "
             "<a href='https://github.com/jhsoby/wikilinksbot'>on GitHub</a> – "
-            "Feel free to report any issues you may have with me there! 😊"),
+            "Feel free to report any issues you may have with me there! 😊"
+            "If you just have some questions, feel free to ask my creator, @jhsoby."),
     "setwiki_success": "✅ The URL for {0} has been updated to {1} for this chat.",
     "setwiki_error": ("The format for the /setwiki command is:\n"
             "<code>/setwiki (normallinks|wikibaselinks) https://$URL/</code>\n\n"
@@ -35,8 +38,9 @@ messages = {
             "This will change the link settings for this entire chat, so use with caution."),
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
-            "<code>/toggle (normallinks|wikibaselinks) (on|off)</code>\n\n"
-            "By default both are turned on. If both are turned off, the bot will "
+            "<code>/toggle (normallinks|wikibaselinks|phabricator) (on|off)</code>\n\n"
+            "By default normallinks and wikibaselinks are turned on, while phabricator is "
+            "turned off. If all are turned off, the bot will "
             "in effect be disabled."),
     "setlang_success": "✅ The language priority list for labels has now been changed to <code>{0}</code>.",
     "setlang_error": ("The format for the /setlang command is:\n"
@@ -102,7 +106,17 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                     lemma = data["entities"][item]["lemmas"][lang]["value"]
                     language = data["entities"][item]["lemmas"][lang]["language"]
                     label = lemma + " [<code>" + language + "</code>]"
-                    return label
+                    return sep_override + " " + label
+            except:
+                return False
+    elif item[0] == "T": # Is the "item" actually a Phabricator task?
+        with urllib.request.urlopen("https://phabricator.wikimedia.org/api/maniphest.search?api.token=" + bot_config.phabtoken + "&limit=1&constraints[ids][0]=" + item[1:]) as url:
+            data = json.loads(url.read().decode())
+            try:
+                title = data["result"]["data"][0]["fields"]["name"]
+                status = data["result"]["data"][0]["fields"]["status"]["name"].lower()
+                label = title + " <code>[" + status + "]</code>"
+                return sep_override + " " + label
             except:
                 return False
     return False
@@ -166,6 +180,13 @@ def linkformatter(link, conf):
             return formatted.format(url, display, linklabel)
         else:
             return formatted.format(url, display, "")
+    elif (link[0] == "T") and conf["toggle_phabricator"]:
+        url = "https://phabricator.wikimedia.org/" + url
+        tasklabel = labelfetcher(display, "en", conf["wikibaselinks"])
+        if tasklabel:
+            return formatted.format(url, display, tasklabel)
+        else:
+            return formatted.format(url, display, "")
     else:
         return False
 
@@ -197,6 +218,7 @@ def getconfig(chat_id):
         "wikibaselinks": "https://www.wikidata.org/",
         "toggle_normallinks": True,
         "toggle_wikibaselinks": True,
+        "toggle_phabricator": False,
         "language": "en"
     }
     with open("group_settings.json", "r") as settings:
@@ -244,7 +266,7 @@ def config(update, context):
             update.message.reply_text(text=messages["setwiki_error"], parse_mode="html")
     elif command == "/toggle" and len(message) >= 3:
         option = "toggle_" + message[1]
-        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links"}
+        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links"}
         toggle = message[2]
         toggles = {"on": True, "off": False}
         if option in options and toggle in ["on", "off"]:
@@ -258,7 +280,7 @@ def config(update, context):
                 json.dump(settings, f, indent=4)
                 f.truncate()
             successtext = messages["toggle_success"].format(options[option], toggle)
-            update.message.reply_text(text=succestext, parse_mode="html")
+            update.message.reply_text(text=successtext, parse_mode="html")
         else:
             update.message.reply_text(text=messages["toggle_error"], parse_mode="html")
     elif command == "/setlang" and len(message) >= 2:
