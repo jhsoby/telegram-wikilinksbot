@@ -10,6 +10,7 @@ This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q33
 * Changing the default URLs used for links in one group _(group admins only)_
 * Changing the language used for labels for Wikidata entities _(group admins only)_
 * Toggle which type of link the bot should post _(group admins only)_
+* List the current configuration of the bot _(group admins only)_
 
 ## How to use in a chat
 Add **[@wikilinksbot](t.me/wikilinksbot)** to your group, and test it out by sending
@@ -70,6 +71,13 @@ Disable Wikidata links:
 ```
 /toggle wikibaselinks off
 ```
+
+#### List bot configuration
+```
+/listconfig
+```
+
+This command will make the bot list the configuration for the current chat, highlighting options that are different from the default.
 
 ## How to run
 ### Prerequisites

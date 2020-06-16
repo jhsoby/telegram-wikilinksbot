@@ -21,7 +21,8 @@ messages = {
             "try any of them here to see how they work:\n\n"
             "/setwiki - Change which wiki links point to\n"
             "/setlang - Change which language to use for Wikidata labels\n"
-            "/toggle - Turn the link types on or off\n\n"
+            "/toggle - Turn the link types on or off\n"
+            "/listconfig - Show the current configuration for this chat\n\n"
             "If you don't like one of my messages, reply to it with <code>/delete</code>, "
             "and I will delete it. If I'm made administrator in a group, I will delete "
             "your <code>/delete</code> message as well!\n\n"
@@ -75,7 +76,7 @@ def labelfetcher(item, languages, wb, sep_override="–"):
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + languages + "&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
             sep = sep_override
-            if item[0] == "Q":
+            if item[0] == "Q": # Easter egg! Check if the item has P487 (normally an emoji) set, and use that instead of the separator if there is one.
                 with urllib.request.urlopen(wb + "w/api.php?action=wbgetclaims&entity=" + item + "&property=P487&format=json") as emoji:
                     emojidata = json.loads(emoji.read().decode())
                     if "claims" in emojidata:
@@ -89,11 +90,11 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                         label = data["entities"][item]["labels"][lang]["value"]
                         if not lang == languages[0]:
                             label = label + " [<code>" + lang + "</code>]"
-                        if label == sep:
-                            sep = sep_override
-                        elif len(sep) == 1 and ord(sep) < 128:
-                            sep = sep_override
-                        elif re.match(r"\w", sep):
+                        if (
+                            label == sep
+                            or (len(sep) == 1 and ord(sep) < 128)
+                            or re.match(r"\w", sep)
+                        ): # Check if the emoji is probably an emoji, and not some other character
                             sep = sep_override
                         return sep + " " + label
             except:
@@ -141,35 +142,35 @@ def linkformatter(link, conf):
     Formats a single link in the correct way.
     """
     section = False
-    display = link
-    url = link
+    display = link # The text that will be displayed, i.e. <a>display</a>
+    url = link # The url we will link to, i.e. <a href="url">display</a>
     formatted = "<a href='{0}'>{1}</a> {2}"
-    if re.match(r"[QLP]\d+#P\d+", link):
+    if re.match(r"[QLP]\d+#P\d+", link): # Is the link to a statement in an item?
         link, section = link.split("#")
-    elif re.match(r"L\d+-[SF]\d+", link):
+    elif re.match(r"L\d+-[SF]\d+", link): # Is the link to a specific form of a lexeme?
         link, section = link.split("-")
         display = link + "-" + section
         url = link + "#" + section
-    linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"])
-    if section:
+    linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"]) # Get the label for the item. Can be False if no appropriate label is found.
+    if section: # Get the label for the section that is linked to if possible
         sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
-    prefixes = {
+    prefixes = { # Namespaces for the various entities
         "Q": "",
         "P": "Property:",
         "L": "Lexeme:",
         "E": "EntitySchema:"
     }
-    if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]:
+    if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
         link = re.sub(r"[\[\]\|]", "", display)
-        display = "&#91;&#91;" + link + "&#93;&#93;"
-        url = conf["normallinks"] + "wiki/" + link.replace(" ", "_")
-        redirect = resolveredirect(link, conf["normallinks"])
+        display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
+        url = conf["normallinks"] + "wiki/" + link.replace(" ", "_") # Replaces spaces with underscores
+        redirect = resolveredirect(link, conf["normallinks"]) # Check if the link is actually a redirect
         if redirect:
-            url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_")
-            return formatted.format(url, display, "⮡ " + redirect)
+            url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
+            return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
         else:
             return formatted.format(url, display, "")
-    elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]:
+    elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
         url = conf["wikibaselinks"] + "wiki/" + prefixes[link[0]] + url
         if section:
             if linklabel:
@@ -180,9 +181,9 @@ def linkformatter(link, conf):
             return formatted.format(url, display, linklabel)
         else:
             return formatted.format(url, display, "")
-    elif (link[0] == "T") and conf["toggle_phabricator"]:
-        url = "https://phabricator.wikimedia.org/" + url
-        tasklabel = labelfetcher(display, "en", conf["wikibaselinks"])
+    elif (link[0] == "T") and conf["toggle_phabricator"]: # Is the link to a Phabricator task?
+        url = "https://phabricator.wikimedia.org/" + url # Hardcoded. Can't be bothered to add config for this atm
+        tasklabel = labelfetcher(display, "en", conf["wikibaselinks"]) # Actually only the display is needed, but the function expects language and config as well, even though they won't be used in this case
         if tasklabel:
             return formatted.format(url, display, tasklabel)
         else:
@@ -198,11 +199,11 @@ def link(update, context):
     and entity schemas. It will however _not_ post a link when the entity is
     mentioned as part of a URL.
     """
-    linklist = re.findall(regex, update.message.text)
-    fmt_linklist = []
+    linklist = re.findall(regex, update.message.text) # List all matches with the main regex
+    fmt_linklist = [] # Formatted link list
     for link in linklist:
         link = linkformatter(link[0], getconfig(update.effective_chat.id))
-        if link and (not link in fmt_linklist):
+        if link and (not link in fmt_linklist): # Add the formatted link to the list if it's not already there
             fmt_linklist.append(link)
     if len(fmt_linklist) > 0:
         context.bot.send_message(chat_id=update.effective_chat.id, text="\n".join(fmt_linklist), disable_web_page_preview=True, disable_notification=True, parse_mode="html")
@@ -213,7 +214,7 @@ def getconfig(chat_id):
     and overrides the defaults (conf) with what's in the config file.
     """
     chat_id = str(chat_id)
-    conf = {
+    conf = { # Default configuration
         "normallinks": "https://en.wikipedia.org/",
         "wikibaselinks": "https://www.wikidata.org/",
         "toggle_normallinks": True,
@@ -305,6 +306,35 @@ def config(update, context):
                 f.truncate()
             successtext = messages["setlang_success"].format(languages)
             update.message.reply_text(text=successtext, parse_mode="html")
+    elif command == "/listconfig":
+        onoff = {
+            "True": "on",
+            "False": "off"
+        }
+        configexplanations = {
+            "normallinks": "Target URL for [[normal links]]: {}",
+            "wikibaselinks": "Target URL for Wikibase links: {}",
+            "toggle_normallinks": "Normal links are toggled {}",
+            "toggle_wikibaselinks": "Wikibase links are toggled {}",
+            "toggle_phabricator": "Phabricator links are toggled {}",
+            "language": "The language priority list for labels is {}"
+        }
+        configlist = ["The following is the bot configuration for this chat. Settings in <b>bold</b> are different from the default setting.\n"]
+        defaultconfig = getconfig("dummy") # Get config with a dummy chat id
+        thisconfig = getconfig(update.effective_chat.id) # Get config for this chat
+        for k in defaultconfig:
+            if defaultconfig[k] == thisconfig[k]:
+                if type(thisconfig[k]) is not bool:
+                    configlist.append("· " + configexplanations[k].format(thisconfig[k]) + " (<i>default</i>)")
+                else:
+                    configlist.append("· " + configexplanations[k].format(onoff[str(thisconfig[k])]) + " (<i>default</i>)")
+            else:
+                if type(thisconfig[k]) is not bool:
+                    configlist.append("· <b>" + configexplanations[k].format(thisconfig[k]) + "</b>")
+                else:
+                    configlist.append("· <b>" + configexplanations[k].format(onoff[str(thisconfig[k])]) + "</b>")
+        configlist.append("\nAs always, you can reply to this message with /delete to delete this message.")
+        update.message.reply_text(text="\n".join(configlist), parse_mode="html", disable_web_page_preview=True)
     else:
         errortext = messages[command[1:] + "_error"]
         update.message.reply_text(text=errortext, parse_mode="html")
@@ -340,7 +370,7 @@ def start(update, context):
 
 
 link_handler = MessageHandler(Filters.regex(regex), link)
-config_handler = CommandHandler(['setwiki', 'setlang', 'toggle'], config)
+config_handler = CommandHandler(['setwiki', 'setlang', 'toggle', 'listconfig'], config)
 start_handler = CommandHandler(['start', 'help'], start)
 delete_handler = CommandHandler('delete', delete)
 
