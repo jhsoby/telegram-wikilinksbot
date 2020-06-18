@@ -154,12 +154,6 @@ def linkformatter(link, conf):
     linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"]) # Get the label for the item. Can be False if no appropriate label is found.
     if section: # Get the label for the section that is linked to if possible
         sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
-    prefixes = { # Namespaces for the various entities
-        "Q": "",
-        "P": "Property:",
-        "L": "Lexeme:",
-        "E": "EntitySchema:"
-    }
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
@@ -170,8 +164,8 @@ def linkformatter(link, conf):
             return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
         else:
             return formatted.format(url, display, "")
-    elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
-        url = conf["wikibaselinks"] + "wiki/" + prefixes[link[0]] + url
+    elif (link[0] in "QPLEM") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
+        url = conf["wikibaselinks"] + "entity/" + url
         if section:
             if linklabel:
                 linklabel += sectionlabel
