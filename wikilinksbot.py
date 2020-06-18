@@ -7,7 +7,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!wiki/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLET][1-9]\d*(#P\d+)?))")
+regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLETM][1-9]\d*(#P[1-9]\d*)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
@@ -145,7 +145,7 @@ def linkformatter(link, conf):
     display = link # The text that will be displayed, i.e. <a>display</a>
     url = link # The url we will link to, i.e. <a href="url">display</a>
     formatted = "<a href='{0}'>{1}</a> {2}"
-    if re.match(r"[QLP]\d+#P\d+", link): # Is the link to a statement in an item?
+    if re.match(r"[QLPM]\d+#P\d+", link): # Is the link to a statement in an item?
         link, section = link.split("#")
     elif re.match(r"L\d+-[SF]\d+", link): # Is the link to a specific form of a lexeme?
         link, section = link.split("-")
