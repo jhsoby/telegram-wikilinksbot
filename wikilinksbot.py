@@ -7,7 +7,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<!\w[=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLETM][1-9]\d*(#P[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLET][1-9]\d*(#P[1-9]\d*)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
@@ -164,7 +164,7 @@ def linkformatter(link, conf):
             return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
         else:
             return formatted.format(url, display, "")
-    elif (link[0] in "QPLEM") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
+    elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
         url = conf["wikibaselinks"] + "entity/" + url
         if section:
             if linklabel:
@@ -175,6 +175,9 @@ def linkformatter(link, conf):
             return formatted.format(url, display, linklabel)
         else:
             return formatted.format(url, display, "")
+    elif (link[0] == "M") and conf["toggle_wikibaselinks"]: # should have its own toggle
+        url = "https://commons.wikimedia.org/" + "entity/" + url # could be made configurable eventually
+        return formatted.format(url, display, "")
     elif (link[0] == "T") and conf["toggle_phabricator"]: # Is the link to a Phabricator task?
         url = "https://phabricator.wikimedia.org/" + url # Hardcoded. Can't be bothered to add config for this atm
         tasklabel = labelfetcher(display, "en", conf["wikibaselinks"]) # Actually only the display is needed, but the function expects language and config as well, even though they won't be used in this case
