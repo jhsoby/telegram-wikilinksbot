@@ -157,7 +157,7 @@ def linkformatter(link, conf):
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
-        url = conf["normallinks"] + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] else "") + link.replace(" ", "_") # Replaces spaces with underscores
+        url = conf["normallinks"] + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and not link.startswith("Special:") else "") + link.replace(" ", "_") # Replaces spaces with underscores
         redirect = resolveredirect(link, conf["normallinks"]) # Check if the link is actually a redirect
         if redirect:
             url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
