@@ -144,7 +144,7 @@ def linkformatter(link, conf):
     section = False
     display = link # The text that will be displayed, i.e. <a>display</a>
     url = link # The url we will link to, i.e. <a href="url">display</a>
-    formatted = "<a href='{0}'>{1}</a> {2}"
+    formatted = "<a href=\"{0}\">{1}</a> {2}"
     if re.match(r"[QLPM]\d+#P\d+", link): # Is the link to a statement in an item?
         link, section = link.split("#")
     elif re.match(r"L\d+-[SF]\d+", link): # Is the link to a specific form of a lexeme?
