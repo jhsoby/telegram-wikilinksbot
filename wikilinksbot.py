@@ -110,6 +110,18 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                     return sep_override + " " + label
             except:
                 return False
+    elif item[0] == "E": # Is the item an EntitySchema?
+        # Should be replaced when EntitySchemas' terms are more
+        # readily accessible via the API.
+        language = languages.split("|")[0]
+        with urllib.request.urlopen(wb + "w/api.php?format=json&action=parse&uselang=" + language + "&page=EntitySchema:" + item) as url:
+            data = json.loads(url.read().decode())
+            try:
+                title = data["parse"]["displaytitle"]
+                label = re.search(r"<span class=\"entityschema-title-label\">([^<]+)</span>", title).group(1)
+                return sep_override + " " + label
+            except:
+                return False
     elif item[0] == "T": # Is the "item" actually a Phabricator task?
         with urllib.request.urlopen("https://phabricator.wikimedia.org/api/maniphest.search?api.token=" + bot_config.phabtoken + "&limit=1&constraints[ids][0]=" + item[1:]) as url:
             data = json.loads(url.read().decode())
