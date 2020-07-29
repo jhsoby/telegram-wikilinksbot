@@ -166,6 +166,8 @@ def linkformatter(link, conf):
             return formatted.format(url, display, "")
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
         url = conf["wikibaselinks"] + "entity/" + url
+        if link[0] == "E": # Remove this if/when EntitySchema links work with entity/ URLs
+            url = url.replace("entity/", "wiki/EntitySchema:")
         if section:
             if linklabel:
                 linklabel += sectionlabel
