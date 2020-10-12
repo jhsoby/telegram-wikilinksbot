@@ -16,7 +16,7 @@ messages = {
             "to test me out and learn about how I can be configured. If you don't "
             "like one of my messages, reply to it with <code>/delete</code>."),
     "start-private": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata entities "
-            "and optionally Phabricator tasks "
+            "and Phabricator tasks "
             "when they are mentioned in chats. I have the following configuration options, "
             "try any of them here to see how they work:\n\n"
             "/setwiki - Change which wiki links point to\n"
@@ -40,8 +40,7 @@ messages = {
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
             "<code>/toggle (normallinks|wikibaselinks|phabricator) (on|off)</code>\n\n"
-            "By default normallinks and wikibaselinks are turned on, while phabricator is "
-            "turned off. If all are turned off, the bot will "
+            "By default all are turned on. If all are turned off, the bot will "
             "in effect be disabled."),
     "setlang_success": "✅ The language priority list for labels has now been changed to <code>{0}</code>.",
     "setlang_error": ("The format for the /setlang command is:\n"
@@ -257,7 +256,7 @@ def getconfig(chat_id):
         "wikibaselinks": "https://www.wikidata.org/",
         "toggle_normallinks": True,
         "toggle_wikibaselinks": True,
-        "toggle_phabricator": False,
+        "toggle_phabricator": True,
         "language": "en"
     }
     with open("group_settings.json", "r") as settings:

@@ -7,10 +7,11 @@ With the way this bot is currently set up on Toolforge, this is how to do update
 3. `become telegram-wikilinksbot`
 4. `script /dev/null`
 5. `screen -r`
-6. Ctrl+C (maybe twice) to exit the current process
-7. `git pull`
-8. `python3 wikilinksbot.py`
-9. Ctrl+A, Ctrl+D to exit screen
+6. `screen -r <number from the list>`
+7. Ctrl+C (maybe twice) to exit the current process
+8. `git pull`
+9. `python3 wikilinksbot.py`
+10. Ctrl+A, Ctrl+D to exit screen
 
 Just to restart it, in case it stops working for some reason:
-* Steps 2–5 and 8.
+* Steps 2–6 and 8.
