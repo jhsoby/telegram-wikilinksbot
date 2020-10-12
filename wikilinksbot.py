@@ -134,20 +134,42 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                 return False
     return False
 
-def resolveredirect(link, url):
+def resolveredirect(domain, link):
     """
     Checks [[normal links]] for whether or not they are redirects, and gets
     the target title for the redirect page.
     """
     target = link
-    with urllib.request.urlopen(url + "w/api.php?action=query&titles=" + urllib.parse.quote(link) + "&redirects=1&format=json") as apiresult:
-        api = json.loads(apiresult.read().decode())["query"]
-        if "redirects" in api:
-            target = api["redirects"][0]["to"]
+    with urllib.request.urlopen(domain + "w/api.php?action=query&titles=" + urllib.parse.quote(link) + "&redirects=1&format=json") as apiresult:
+        api = json.loads(apiresult.read().decode())
+        if ("query" in api) and ("redirects" in api["query"]):
+            target = api["query"]["redirects"][0]["to"]
     if link == target:
         return False
     else:
         return target
+        
+def interwiki(domain, link):
+    """
+    Returns domain and link target to enable direct links for interwiki links.
+    """
+    if not len(link):
+        return [domain, link]
+    if link[0] == ":":
+        link = link[1:]
+    linkx = link.split(":")
+    if len(linkx) == 1:
+        return [domain, link]
+    else:
+        with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&titles=" + urllib.parse.quote(link)) as apiresult:
+            api = json.loads(apiresult.read().decode())["query"]
+            if not "interwiki" in api:
+                return [domain, link]
+            else:
+                domain = api["interwiki"][0]["url"]
+                domain = "/".join(domain.split("/")[:3]) + "/"
+                link = ":".join(linkx[1:])
+                return interwiki(domain, link)
 
 def linkformatter(link, conf):
     """
@@ -174,10 +196,11 @@ def linkformatter(link, conf):
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
-        url = conf["normallinks"] + "wiki/" + link.replace(" ", "_") # Replaces spaces with underscores
-        redirect = resolveredirect(link, conf["normallinks"]) # Check if the link is actually a redirect
+        domain, link = interwiki(conf["normallinks"], link)
+        url = domain + "wiki/" + link.replace(" ", "_") # Replaces spaces with underscores
+        redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
         if redirect:
-            url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
+            url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
             return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
         else:
             return formatted.format(url, display, "")
