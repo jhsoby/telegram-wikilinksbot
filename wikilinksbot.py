@@ -167,6 +167,7 @@ def linkformatter(link, conf):
         link, section = link.split("-")
         display = link + "-" + section
         url = link + "#" + section
+        sectionlabel = True
     linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"]) # Get the label for the item. Can be False if no appropriate label is found.
     if sectionlabel: # Get the label for the section that is linked to if possible
         sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
