@@ -7,7 +7,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|(?<!\w)(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLETM][1-9]\d*(#P[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?[\||\]]|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?|T[1-9]\d*(#[1-9]\d*)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
@@ -16,7 +16,7 @@ messages = {
             "to test me out and learn about how I can be configured. If you don't "
             "like one of my messages, reply to it with <code>/delete</code>."),
     "start-private": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata entities "
-            "and optionally Phabricator tasks "
+            "and Phabricator tasks "
             "when they are mentioned in chats. I have the following configuration options, "
             "try any of them here to see how they work:\n\n"
             "/setwiki - Change which wiki links point to\n"
@@ -40,8 +40,7 @@ messages = {
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
             "<code>/toggle (normallinks|wikibaselinks|phabricator) (on|off)</code>\n\n"
-            "By default normallinks and wikibaselinks are turned on, while phabricator is "
-            "turned off. If all are turned off, the bot will "
+            "By default all are turned on. If all are turned off, the bot will "
             "in effect be disabled."),
     "setlang_success": "✅ The language priority list for labels has now been changed to <code>{0}</code>.",
     "setlang_error": ("The format for the /setlang command is:\n"
@@ -110,6 +109,18 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                     return sep_override + " " + label
             except:
                 return False
+    elif item[0] == "E": # Is the item an EntitySchema?
+        # Should be replaced when EntitySchemas' terms are more
+        # readily accessible via the API.
+        language = languages.split("|")[0]
+        with urllib.request.urlopen(wb + "w/api.php?format=json&action=parse&uselang=" + language + "&page=EntitySchema:" + item) as url:
+            data = json.loads(url.read().decode())
+            try:
+                title = data["parse"]["displaytitle"]
+                label = re.search(r"<span class=\"entityschema-title-label\">([^<]+)</span>", title).group(1)
+                return sep_override + " " + label
+            except:
+                return False
     elif item[0] == "T": # Is the "item" actually a Phabricator task?
         with urllib.request.urlopen("https://phabricator.wikimedia.org/api/maniphest.search?api.token=" + bot_config.phabtoken + "&limit=1&constraints[ids][0]=" + item[1:]) as url:
             data = json.loads(url.read().decode())
@@ -122,50 +133,80 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                 return False
     return False
 
-def resolveredirect(link, url):
+def resolveredirect(domain, link):
     """
     Checks [[normal links]] for whether or not they are redirects, and gets
     the target title for the redirect page.
     """
     target = link
-    with urllib.request.urlopen(url + "w/api.php?action=query&titles=" + urllib.parse.quote(link) + "&redirects=1&format=json") as apiresult:
-        api = json.loads(apiresult.read().decode())["query"]
-        if "redirects" in api:
-            target = api["redirects"][0]["to"]
+    with urllib.request.urlopen(domain + "w/api.php?action=query&titles=" + urllib.parse.quote(link) + "&redirects=1&format=json") as apiresult:
+        api = json.loads(apiresult.read().decode())
+        if ("query" in api) and ("redirects" in api["query"]):
+            target = api["query"]["redirects"][0]["to"]
     if link == target:
         return False
     else:
         return target
+        
+def interwiki(domain, link):
+    """
+    Returns domain and link target to enable direct links for interwiki links.
+    """
+    if not len(link):
+        return [domain, link]
+    if link[0] == ":":
+        link = link[1:]
+    linkx = link.split(":")
+    if len(linkx) == 1:
+        return [domain, link]
+    else:
+        with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&titles=" + urllib.parse.quote(link)) as apiresult:
+            api = json.loads(apiresult.read().decode())["query"]
+            if not "interwiki" in api:
+                return [domain, link]
+            else:
+                domain = api["interwiki"][0]["url"]
+                domain = "/".join(domain.split("/")[:3]) + "/"
+                link = ":".join(linkx[1:])
+                return interwiki(domain, link)
 
 def linkformatter(link, conf):
     """
     Formats a single link in the correct way.
     """
     section = False
+    sectionlabel = False
     display = link # The text that will be displayed, i.e. <a>display</a>
     url = link # The url we will link to, i.e. <a href="url">display</a>
-    formatted = "<a href='{0}'>{1}</a> {2}"
+    formatted = "<a href=\"{0}\">{1}</a> {2}"
     if re.match(r"[QLPM]\d+#P\d+", link): # Is the link to a statement in an item?
+        link, section = link.split("#")
+        sectionlabel = True
+    elif re.match(r"T\d+#\d+", link):
         link, section = link.split("#")
     elif re.match(r"L\d+-[SF]\d+", link): # Is the link to a specific form of a lexeme?
         link, section = link.split("-")
         display = link + "-" + section
         url = link + "#" + section
+        sectionlabel = True
     linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"]) # Get the label for the item. Can be False if no appropriate label is found.
-    if section: # Get the label for the section that is linked to if possible
+    if sectionlabel: # Get the label for the section that is linked to if possible
         sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
-        url = conf["normallinks"] + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and not link.startswith("Special:") else "") + link.replace(" ", "_") # Replaces spaces with underscores
-        redirect = resolveredirect(link, conf["normallinks"]) # Check if the link is actually a redirect
+        domain, link = interwiki(conf["normallinks"], link)
+        url = domain + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and not link.startswith("Special:") else "") + link.replace(" ", "_") # Replaces spaces with underscores
+        redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
         if redirect:
-            url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
+            url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
             return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
         else:
             return formatted.format(url, display, "")
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
         url = conf["wikibaselinks"] + "entity/" + url
+        if link[0] == "E": # Remove this if/when EntitySchema links work with entity/ URLs
+            url = url.replace("entity/", "wiki/EntitySchema:")
         if section:
             if linklabel:
                 linklabel += sectionlabel
@@ -180,9 +221,8 @@ def linkformatter(link, conf):
         return formatted.format(url, display, "")
     elif (link[0] == "T") and conf["toggle_phabricator"]: # Is the link to a Phabricator task?
         url = "https://phabricator.wikimedia.org/" + url # Hardcoded. Can't be bothered to add config for this atm
-        tasklabel = labelfetcher(display, "en", conf["wikibaselinks"]) # Actually only the display is needed, but the function expects language and config as well, even though they won't be used in this case
-        if tasklabel:
-            return formatted.format(url, display, tasklabel)
+        if linklabel:
+            return formatted.format(url, display, linklabel)
         else:
             return formatted.format(url, display, "")
     else:
@@ -216,7 +256,7 @@ def getconfig(chat_id):
         "wikibaselinks": "https://www.wikidata.org/",
         "toggle_normallinks": True,
         "toggle_wikibaselinks": True,
-        "toggle_phabricator": False,
+        "toggle_phabricator": True,
         "toggle_mylanguage": False,
         "language": "en"
     }
