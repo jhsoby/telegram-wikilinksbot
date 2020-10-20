@@ -196,7 +196,7 @@ def linkformatter(link, conf):
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
         domain, link = interwiki(conf["normallinks"], link)
-        url = domain + "wiki/" + link.replace(" ", "_") # Replaces spaces with underscores
+        url = domain + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and not link.startswith("Special:") else "") + link.replace(" ", "_") # Replaces spaces with underscores
         redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
         if redirect:
             url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
@@ -257,6 +257,7 @@ def getconfig(chat_id):
         "toggle_normallinks": True,
         "toggle_wikibaselinks": True,
         "toggle_phabricator": True,
+        "toggle_mylanguage": False,
         "language": "en"
     }
     with open("group_settings.json", "r") as settings:
@@ -304,7 +305,7 @@ def config(update, context):
             update.message.reply_text(text=messages["setwiki_error"], parse_mode="html")
     elif command == "/toggle" and len(message) >= 3:
         option = "toggle_" + message[1]
-        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links"}
+        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links", "toggle_mylanguage": "Special:MyLanguage for [[wiki links]]"}
         toggle = message[2]
         toggles = {"on": True, "off": False}
         if option in options and toggle in ["on", "off"]:
@@ -354,6 +355,7 @@ def config(update, context):
             "toggle_normallinks": "Normal links are toggled {}",
             "toggle_wikibaselinks": "Wikibase links are toggled {}",
             "toggle_phabricator": "Phabricator links are toggled {}",
+            "toggle_mylanguage": "Special:MyLanguage for links are toggled {}",
             "language": "The language priority list for labels is {}"
         }
         configlist = ["The following is the bot configuration for this chat. Settings in <b>bold</b> are different from the default setting.\n"]
