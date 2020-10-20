@@ -67,10 +67,12 @@ Set the label language order to Norwegian Bokmål, Norwegian Nynorsk, Swedish an
 
 #### Toggle link types
 ```
-/toggle (normallinks|wikibaselinks|phabricator) (on|off)
+/toggle (normallinks|wikibaselinks|phabricator|mylanguage) (on|off)
 ```
 
 This command is used to turn on/off one of the link types. If all link types are turned off, the bot is essentially disabled. By default, all are turned on.
+
+`mylanguage` toggles whether or not links should be prefixed with "Special:MyLanguage/". When toggled on, this will only happen for links to translatable pages.
 
 **Example:**  
 Disable Wikidata links:
