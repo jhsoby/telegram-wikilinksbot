@@ -39,9 +39,9 @@ messages = {
             "This will change the link settings for this entire chat, so use with caution."),
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
-            "<code>/toggle (normallinks|wikibaselinks|phabricator) (on|off)</code>\n\n"
-            "By default all are turned on. If all are turned off, the bot will "
-            "in effect be disabled."),
+            "<code>/toggle (normallinks|wikibaselinks|phabricator|mylanguage) (on|off)</code>\n\n"
+            "By default all are turned on. If all are turned off, "
+            "the bot will in effect be disabled."),
     "setlang_success": "✅ The language priority list for labels has now been changed to <code>{0}</code>.",
     "setlang_error": ("The format for the /setlang command is:\n"
             "<code>/setlang language_code</code>\n\n"
@@ -170,6 +170,20 @@ def interwiki(domain, link):
                 link = ":".join(linkx[1:])
                 return interwiki(domain, link)
 
+def translatable(domain, link):
+    """
+    Checks whether or not a page is translatable (thus whether or not it makes
+    sense to add Special:MyLanguage in front of it).
+    
+    (This API call could be improved if T265974 is acted upon.)
+    """
+    with urllib.request.urlopen(domain + "w/api.php?format=json&action=parse&prop=modules|jsconfigvars&page=" + urllib.parse.quote(link)) as apiresult:
+        api = json.loads(apiresult.read().decode())
+        if ("parse" in api) and ("ext.translate" in api["parse"]["modulestyles"]):
+            return True
+        else:
+            return False
+
 def linkformatter(link, conf):
     """
     Formats a single link in the correct way.
@@ -196,7 +210,7 @@ def linkformatter(link, conf):
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
         domain, link = interwiki(conf["normallinks"], link)
-        url = domain + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and not link.startswith("Special:") else "") + link.replace(" ", "_") # Replaces spaces with underscores
+        url = domain + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and translatable(domain, link) else "") + link.replace(" ", "_") # Replaces spaces with underscores
         redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
         if redirect:
             url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
@@ -257,7 +271,7 @@ def getconfig(chat_id):
         "toggle_normallinks": True,
         "toggle_wikibaselinks": True,
         "toggle_phabricator": True,
-        "toggle_mylanguage": False,
+        "toggle_mylanguage": True,
         "language": "en"
     }
     with open("group_settings.json", "r") as settings:
@@ -355,7 +369,7 @@ def config(update, context):
             "toggle_normallinks": "Normal links are toggled {}",
             "toggle_wikibaselinks": "Wikibase links are toggled {}",
             "toggle_phabricator": "Phabricator links are toggled {}",
-            "toggle_mylanguage": "Special:MyLanguage for links are toggled {}",
+            "toggle_mylanguage": "Special:MyLanguage for applicable links are toggled {}",
             "language": "The language priority list for labels is {}"
         }
         configlist = ["The following is the bot configuration for this chat. Settings in <b>bold</b> are different from the default setting.\n"]
