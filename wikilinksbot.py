@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import urllib.request, urllib.parse, json
+import random
 import re
 import gc
 import bot_config
@@ -72,7 +73,7 @@ def labelfetcher(item, languages, wb, sep_override="–"):
     if not item:
         return False
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
-        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + languages + "&props=labels&format=json&ids=" + item) as url:
+        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
             sep = sep_override
             if item[0] == "Q": # Easter egg! Check if the item has P487 (normally an emoji) set, and use that instead of the separator if there is one.
@@ -83,19 +84,22 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                             if emojidata["claims"]["P487"][0]["mainsnak"]["snaktype"] == "value":
                                 sep = emojidata["claims"]["P487"][0]["mainsnak"]["datavalue"]["value"]
             try:
-                languages = (languages + "|en").split("|")
-                for lang in languages:
-                    if lang in data["entities"][item]["labels"]:
-                        label = data["entities"][item]["labels"][lang]["value"]
-                        if not lang == languages[0]:
-                            label = label + " [<code>" + lang + "</code>]"
-                        if (
-                            label == sep
-                            or (len(sep) == 1 and ord(sep) < 128)
-                            or re.match(r"\w", sep)
-                        ): # Check if the emoji is probably an emoji, and not some other character
-                            sep = sep_override
-                        return sep + " " + label
+                present_labels = data["entities"][item]["labels"] # All labels for the item
+                priority_languages = (languages + "|en").split("|") # Languages for the chat, set by /setlang
+                labellang = random.choice(list(present_labels)) # Choose a random language from the present labels
+                for lang in priority_languages[::-1]: # Go through the list of priority languages from the back, and set whatever language that has a label as the label instead of the randomly chosen one
+                    if lang in present_labels:
+                        labellang = lang
+                label = present_labels[labellang]["value"]
+                if not labellang == priority_languages[0]: # If the final label language is not the first in the priority list, attach the language code for the chosen label
+                    label += " [<code>" + labellang + "</code>]"
+                if (
+                    label == sep
+                    or (len(sep) == 1 and ord(sep) < 128)
+                    or re.match(r"\w", sep)
+                ): # Check if the emoji is probably an emoji, and not some other character
+                    sep = sep_override
+                return sep + " " + label
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
