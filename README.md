@@ -45,13 +45,15 @@ Set [[normal links]] to link to the Shawiya Wiktionary.
 /setwiki normallinks https://shy.wiktionary.org/
 ```
 
-#### Change the language used for Wikidata labels
+#### Change the language priority used for Wikidata labels
 ```
 /setlang language-code
 /setlang language-code-1|language-code-2|language-code-3
 ```
 
 This command is used for changing what language Wikidata labels are fetched in. You can set a number of languages in prioritized order, separated with the pipe character (`|`). English (`en`) is always the last fallback, but it can also be specified before other languages.
+
+If an item doesn't have a label in any of the priority languages (or English), the bot will pick a label at random.
 
 For this to work, the language code(s) must be supported by MediaWiki (see [list in the API](https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages)), but the bot doesn't validate the language code except for a simple regex which checks if it could _theoretically_ be a valid languaged code.
 
@@ -67,10 +69,12 @@ Set the label language order to Norwegian Bokmål, Norwegian Nynorsk, Swedish an
 
 #### Toggle link types
 ```
-/toggle (normallinks|wikibaselinks|phabricator) (on|off)
+/toggle (normallinks|wikibaselinks|phabricator|mylanguage) (on|off)
 ```
 
 This command is used to turn on/off one of the link types. If all link types are turned off, the bot is essentially disabled. By default, all are turned on.
+
+`mylanguage` toggles whether or not links should be prefixed with "Special:MyLanguage/". When toggled on, this will only happen for links to translatable pages.
 
 **Example:**  
 Disable Wikidata links:

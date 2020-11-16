@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import urllib.request, urllib.parse, json
+import random
 import re
 import gc
 import bot_config
@@ -39,9 +40,9 @@ messages = {
             "This will change the link settings for this entire chat, so use with caution."),
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
-            "<code>/toggle (normallinks|wikibaselinks|phabricator) (on|off)</code>\n\n"
-            "By default all are turned on. If all are turned off, the bot will "
-            "in effect be disabled."),
+            "<code>/toggle (normallinks|wikibaselinks|phabricator|mylanguage) (on|off)</code>\n\n"
+            "By default all are turned on. If all are turned off, "
+            "the bot will in effect be disabled."),
     "setlang_success": "✅ The language priority list for labels has now been changed to <code>{0}</code>.",
     "setlang_error": ("The format for the /setlang command is:\n"
             "<code>/setlang language_code</code>\n\n"
@@ -72,7 +73,7 @@ def labelfetcher(item, languages, wb, sep_override="–"):
     if not item:
         return False
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
-        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&languages=" + languages + "&props=labels&format=json&ids=" + item) as url:
+        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
             sep = sep_override
             if item[0] == "Q": # Easter egg! Check if the item has P487 (normally an emoji) set, and use that instead of the separator if there is one.
@@ -83,19 +84,22 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                             if emojidata["claims"]["P487"][0]["mainsnak"]["snaktype"] == "value":
                                 sep = emojidata["claims"]["P487"][0]["mainsnak"]["datavalue"]["value"]
             try:
-                languages = (languages + "|en").split("|")
-                for lang in languages:
-                    if lang in data["entities"][item]["labels"]:
-                        label = data["entities"][item]["labels"][lang]["value"]
-                        if not lang == languages[0]:
-                            label = label + " [<code>" + lang + "</code>]"
-                        if (
-                            label == sep
-                            or (len(sep) == 1 and ord(sep) < 128)
-                            or re.match(r"\w", sep)
-                        ): # Check if the emoji is probably an emoji, and not some other character
-                            sep = sep_override
-                        return sep + " " + label
+                present_labels = data["entities"][item]["labels"] # All labels for the item
+                priority_languages = (languages + "|en").split("|") # Languages for the chat, set by /setlang
+                labellang = random.choice(list(present_labels)) # Choose a random language from the present labels
+                for lang in priority_languages[::-1]: # Go through the list of priority languages from the back, and set whatever language that has a label as the label instead of the randomly chosen one
+                    if lang in present_labels:
+                        labellang = lang
+                label = present_labels[labellang]["value"]
+                if not labellang == priority_languages[0]: # If the final label language is not the first in the priority list, attach the language code for the chosen label
+                    label += " [<code>" + labellang + "</code>]"
+                if (
+                    label == sep
+                    or (len(sep) == 1 and ord(sep) < 128)
+                    or re.match(r"\w", sep)
+                ): # Check if the emoji is probably an emoji, and not some other character
+                    sep = sep_override
+                return sep + " " + label
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
@@ -170,6 +174,20 @@ def interwiki(domain, link):
                 link = ":".join(linkx[1:])
                 return interwiki(domain, link)
 
+def translatable(domain, link):
+    """
+    Checks whether or not a page is translatable (thus whether or not it makes
+    sense to add Special:MyLanguage in front of it).
+    
+    (This API call could be improved if T265974 is acted upon.)
+    """
+    with urllib.request.urlopen(domain + "w/api.php?format=json&action=parse&prop=modules|jsconfigvars&page=" + urllib.parse.quote(link)) as apiresult:
+        api = json.loads(apiresult.read().decode())
+        if ("parse" in api) and ("ext.translate" in api["parse"]["modulestyles"]):
+            return True
+        else:
+            return False
+
 def linkformatter(link, conf):
     """
     Formats a single link in the correct way.
@@ -196,7 +214,7 @@ def linkformatter(link, conf):
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
         domain, link = interwiki(conf["normallinks"], link)
-        url = domain + "wiki/" + link.replace(" ", "_") # Replaces spaces with underscores
+        url = domain + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and translatable(domain, link) else "") + link.replace(" ", "_") # Replaces spaces with underscores
         redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
         if redirect:
             url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
@@ -257,6 +275,7 @@ def getconfig(chat_id):
         "toggle_normallinks": True,
         "toggle_wikibaselinks": True,
         "toggle_phabricator": True,
+        "toggle_mylanguage": True,
         "language": "en"
     }
     with open("group_settings.json", "r") as settings:
@@ -304,7 +323,7 @@ def config(update, context):
             update.message.reply_text(text=messages["setwiki_error"], parse_mode="html")
     elif command == "/toggle" and len(message) >= 3:
         option = "toggle_" + message[1]
-        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links"}
+        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links", "toggle_mylanguage": "Special:MyLanguage for [[wiki links]]"}
         toggle = message[2]
         toggles = {"on": True, "off": False}
         if option in options and toggle in ["on", "off"]:
@@ -354,6 +373,7 @@ def config(update, context):
             "toggle_normallinks": "Normal links are toggled {}",
             "toggle_wikibaselinks": "Wikibase links are toggled {}",
             "toggle_phabricator": "Phabricator links are toggled {}",
+            "toggle_mylanguage": "Special:MyLanguage for applicable links are toggled {}",
             "language": "The language priority list for labels is {}"
         }
         configlist = ["The following is the bot configuration for this chat. Settings in <b>bold</b> are different from the default setting.\n"]
