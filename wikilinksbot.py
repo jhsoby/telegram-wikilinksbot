@@ -113,6 +113,14 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                     return sep_override + " " + label
             except:
                 return False
+    elif item[0] == "M": # Is the item a media item?
+        with urllib.request.urlopen("https://commons.wikimedia.org/w/api.php?action=wbgetentities&format=json&props=info&ids=" + item) as url:
+            data = json.loads(url.read().decode())
+            try:
+                label = data["entities"][item]["title"]
+                return sep_override + " " + label
+            except:
+                return False
     elif item[0] == "E": # Is the item an EntitySchema?
         # Should be replaced when EntitySchemas' terms are more
         # readily accessible via the API.
@@ -236,7 +244,7 @@ def linkformatter(link, conf):
             return formatted.format(url, display, "")
     elif (link[0] == "M") and conf["toggle_wikibaselinks"]: # should have its own toggle
         url = "https://commons.wikimedia.org/" + "entity/" + url # could be made configurable eventually
-        return formatted.format(url, display, "")
+        return formatted.format(url, display, linklabel or "")
     elif (link[0] == "T") and conf["toggle_phabricator"]: # Is the link to a Phabricator task?
         url = "https://phabricator.wikimedia.org/" + url # Hardcoded. Can't be bothered to add config for this atm
         if linklabel:
