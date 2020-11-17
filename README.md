@@ -53,7 +53,7 @@ Set [[normal links]] to link to the Shawiya Wiktionary.
 
 This command is used for changing what language Wikidata labels are fetched in. You can set a number of languages in prioritized order, separated with the pipe character (`|`). English (`en`) is always the last fallback, but it can also be specified before other languages.
 
-If an item doesn't have a label in any of the priority languages (or English), the bot will pick a label at random.
+If an item doesn't have a label in any of the priority languages (or English), the bot will pick a label at random. If you want show the label in a specific language as a one-off, you can use the syntax `Q1234@langcode`, e.g. `Q20@se` will show "Q20 – Norga" no matter what language priority is set for the chat.
 
 For this to work, the language code(s) must be supported by MediaWiki (see [list in the API](https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages)), but the bot doesn't validate the language code except for a simple regex which checks if it could _theoretically_ be a valid languaged code.
 

@@ -8,7 +8,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?|T[1-9]\d*(#[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?[\||\]]|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
@@ -63,7 +63,7 @@ messages = {
             "(including this one) with <code>/delete</code> to delete that message.")
 }
 
-def labelfetcher(item, languages, wb, sep_override="–"):
+def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
     """
     Gets the label from the Wikidata items/properties in question, in the
     language set in the configuration, with a fallback to English, or gets
@@ -72,6 +72,10 @@ def labelfetcher(item, languages, wb, sep_override="–"):
     """
     if not item:
         return False
+    if force_lang:
+        force_lang = force_lang + "|"
+    else:
+        force_lang = ""
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
@@ -85,7 +89,7 @@ def labelfetcher(item, languages, wb, sep_override="–"):
                                 sep = emojidata["claims"]["P487"][0]["mainsnak"]["datavalue"]["value"]
             try:
                 present_labels = data["entities"][item]["labels"] # All labels for the item
-                priority_languages = (languages + "|en").split("|") # Languages for the chat, set by /setlang
+                priority_languages = (force_lang + languages + "|en").split("|") # Languages for the chat, set by /setlang
                 labellang = random.choice(list(present_labels)) # Choose a random language from the present labels
                 for lang in priority_languages[::-1]: # Go through the list of priority languages from the back, and set whatever language that has a label as the label instead of the randomly chosen one
                     if lang in present_labels:
@@ -202,6 +206,7 @@ def linkformatter(link, conf):
     """
     section = False
     sectionlabel = False
+    force_lang = False
     display = link # The text that will be displayed, i.e. <a>display</a>
     url = link # The url we will link to, i.e. <a href="url">display</a>
     formatted = "<a href=\"{0}\">{1}</a> {2}"
@@ -215,7 +220,12 @@ def linkformatter(link, conf):
         display = link + "-" + section
         url = link + "#" + section
         sectionlabel = True
-    linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"]) # Get the label for the item. Can be False if no appropriate label is found.
+    elif "@" in link:
+        link, force_lang = link.split("@")
+        display = link
+        formatted = "<a href=\"{0}\">{1}</a><code>@" + force_lang + "</code> {2}"
+        url = link
+    linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"], force_lang=force_lang) # Get the label for the item. Can be False if no appropriate label is found.
     if sectionlabel: # Get the label for the section that is linked to if possible
         sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
