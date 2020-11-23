@@ -275,7 +275,8 @@ def link(update, context):
     linklist = re.findall(regex, update.message.text) # List all matches with the main regex
     fmt_linklist = [] # Formatted link list
     for link in linklist:
-        link = linkformatter(link[0], getconfig(update.effective_chat.id))
+        link = link[0].replace("\u200e", "").replace("\u200f", "") # Remove &lrm; and &rlm;, cause links to not link in some (mysterious?) circumstances
+        link = linkformatter(link, getconfig(update.effective_chat.id))
         if link and (not link in fmt_linklist): # Add the formatted link to the list if it's not already there
             fmt_linklist.append(link)
     if len(fmt_linklist) > 0:
