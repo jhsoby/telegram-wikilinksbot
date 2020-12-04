@@ -103,7 +103,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
                     or re.match(r"\w", sep)
                 ): # Check if the emoji is probably an emoji, and not some other character
                     sep = sep_override
-                return sep + " " + label
+                return sep + " " + label.replace("&", "&amp;")
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
