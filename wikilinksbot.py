@@ -3,8 +3,17 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import urllib.request, urllib.parse, json
 import random
 import re
+import logging
 import gc
 import bot_config
+
+# Setup logging
+logging.basicConfig(
+    # filename='example.log',
+    encoding='utf-8',
+    level=logging.DEBUG
+)
+
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
@@ -70,6 +79,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
     the lemma and language code for lexemes.
     Returns False if there is no label.
     """
+    logging.debug(f"processing:item:{item}:languages:{languages}")
     if not item:
         return False
     if force_lang:
@@ -109,12 +119,18 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
     elif item[0] == "L": # Is the item a lexeme?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=info&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
+            labels = []
             try:
-                for lang in data["entities"][item]["lemmas"]:
+                lemmas = data["entities"][item]["lemmas"]
+                logging.debug(f"lemmas:{lemmas}")
+                for lang in lemmas:
+                    logging.debug(f"lang:{lang}")
                     lemma = data["entities"][item]["lemmas"][lang]["value"]
+                    logging.debug(f"lemma:{lemma}")
                     language = data["entities"][item]["lemmas"][lang]["language"]
                     label = lemma + " [<code>" + language + "</code>]"
-                    return sep_override + " " + label
+                    labels.append(sep_override + " " + label)
+                return labels
             except:
                 return False
     elif item[0] == "M": # Is the item a media item?
@@ -163,7 +179,7 @@ def resolveredirect(domain, link):
         return False
     else:
         return target
-        
+
 def interwiki(domain, link):
     """
     Returns domain and link target to enable direct links for interwiki links.
@@ -190,7 +206,7 @@ def translatable(domain, link):
     """
     Checks whether or not a page is translatable (thus whether or not it makes
     sense to add Special:MyLanguage in front of it).
-    
+
     (This API call could be improved if T265974 is acted upon.)
     """
     with urllib.request.urlopen(domain + "w/api.php?format=json&action=parse&prop=modules|jsconfigvars&page=" + urllib.parse.quote(link)) as apiresult:
