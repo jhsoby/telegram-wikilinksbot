@@ -19,7 +19,7 @@ This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q33
 * List the current configuration of the bot _(group admins only)_
 
 ## How to use in a chat
-Add **[@wikilinksbot](t.me/wikilinksbot)** to your group, and test it out by sending
+Add **[@wikilinksbot](https://t.me/wikilinksbot)** to your group, and test it out by sending
 a message with a [[wiki link]] or a Wikidata entity like Q42.
 
 If you don't like one of the messages the bot has sent, you can reply to it with `/delete`,
