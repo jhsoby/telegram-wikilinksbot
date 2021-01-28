@@ -185,6 +185,7 @@ def interwiki(domain, link):
                 domain = "/".join(domain.split("/")[:3]) + "/"
                 link = ":".join(linkx[1:])
                 return interwiki(domain, link)
+    return [domain, link]
 
 def translatable(domain, link):
     """
@@ -199,6 +200,7 @@ def translatable(domain, link):
             return True
         else:
             return False
+    return False
 
 def linkformatter(link, conf):
     """
