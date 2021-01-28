@@ -156,9 +156,13 @@ def resolveredirect(domain, link):
     """
     target = link
     with urllib.request.urlopen(domain + "w/api.php?action=query&titles=" + urllib.parse.quote(link) + "&redirects=1&format=json") as apiresult:
-        api = json.loads(apiresult.read().decode())
-        if ("query" in api) and ("redirects" in api["query"]):
-            target = api["query"]["redirects"][0]["to"]
+        try:
+            api = json.loads(apiresult.read().decode())
+        except:
+            pass
+        else:
+            if ("query" in api) and ("redirects" in api["query"]):
+                target = api["query"]["redirects"][0]["to"]
     if link == target:
         return False
     else:
@@ -177,14 +181,18 @@ def interwiki(domain, link):
         return [domain, link]
     else:
         with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&titles=" + urllib.parse.quote(link)) as apiresult:
-            api = json.loads(apiresult.read().decode())["query"]
-            if not "interwiki" in api:
+            try:
+                api = json.loads(apiresult.read().decode())["query"]
+            except:
                 return [domain, link]
             else:
-                domain = api["interwiki"][0]["url"]
-                domain = "/".join(domain.split("/")[:3]) + "/"
-                link = ":".join(linkx[1:])
-                return interwiki(domain, link)
+                if not "interwiki" in api:
+                    return [domain, link]
+                else:
+                    domain = api["interwiki"][0]["url"]
+                    domain = "/".join(domain.split("/")[:3]) + "/"
+                    link = ":".join(linkx[1:])
+                    return interwiki(domain, link)
     return [domain, link]
 
 def translatable(domain, link):
@@ -195,11 +203,15 @@ def translatable(domain, link):
     (This API call could be improved if T265974 is acted upon.)
     """
     with urllib.request.urlopen(domain + "w/api.php?format=json&action=parse&prop=modules|jsconfigvars&page=" + urllib.parse.quote(link)) as apiresult:
-        api = json.loads(apiresult.read().decode())
-        if ("parse" in api) and ("ext.translate" in api["parse"]["modulestyles"]):
-            return True
-        else:
+        try:
+            api = json.loads(apiresult.read().decode())
+        except:
             return False
+        else:
+            if ("parse" in api) and ("ext.translate" in api["parse"]["modulestyles"]):
+                return True
+            else:
+                return False
     return False
 
 def linkformatter(link, conf):
