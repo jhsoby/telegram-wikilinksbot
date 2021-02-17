@@ -173,27 +173,29 @@ def interwiki(domain, link):
     Returns domain and link target to enable direct links for interwiki links.
     """
     if not len(link):
-        return [domain, link]
+        return [domain, link, False]
     if link[0] == ":":
         link = link[1:]
-    linkx = link.split(":")
-    if len(linkx) == 1:
-        return [domain, link]
-    else:
-        with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&titles=" + urllib.parse.quote(link)) as apiresult:
-            try:
-                api = json.loads(apiresult.read().decode())["query"]
-            except:
-                return [domain, link]
+    linksplit = link.split(":")
+    if len(linksplit) == 1:
+        return [domain, link, True]
+    with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&titles=" + urllib.parse.quote(link)) as apiresult:
+        api = json.loads(apiresult.read().decode())["query"]
+        if "interwiki" in api:
+            url_from_api = api["interwiki"][0]["url"]
+            domainsplit = url_from_api.split("/")
+            domain = "/".join(domainsplit[:3]) + "/"
+            link = ":".join(linksplit[1:])
+            if domainsplit[3] == "wiki":
+                return interwiki(domain, link)
             else:
-                if not "interwiki" in api:
-                    return [domain, link]
-                else:
-                    domain = api["interwiki"][0]["url"]
-                    domain = "/".join(domain.split("/")[:3]) + "/"
-                    link = ":".join(linkx[1:])
-                    return interwiki(domain, link)
-    return [domain, link]
+                parsed_link = urllib.parse.quote(link.replace(" ","_"))
+                urlsplit = url_from_api.split(parsed_link)
+                domain = urlsplit[0]
+                link = link + urlsplit[1]
+                return [domain, link, False]
+        else:
+            return [domain, link, True]
 
 def translatable(domain, link):
     """
@@ -245,14 +247,14 @@ def linkformatter(link, conf):
     if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
-        domain, link = interwiki(conf["normallinks"], link)
-        url = domain + "wiki/" + ("Special:MyLanguage/" if conf["toggle_mylanguage"] and translatable(domain, link) else "") + link.replace(" ", "_") # Replaces spaces with underscores
-        redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
-        if redirect:
-            url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
-            return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
-        else:
-            return formatted.format(url, display, "")
+        domain, link, iswiki = interwiki(conf["normallinks"], link)
+        url = domain + ("wiki/" if iswiki else "") + ("Special:MyLanguage/" if iswiki and conf["toggle_mylanguage"] and translatable(domain, link) else "") + link.replace(" ", "_") # Replaces spaces with underscores
+        if iswiki:
+            redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
+            if redirect:
+                url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
+                return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
+        return formatted.format(url, display, "")
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
         url = conf["wikibaselinks"] + "entity/" + url
         if link[0] == "E": # Remove this if/when EntitySchema links work with entity/ URLs
