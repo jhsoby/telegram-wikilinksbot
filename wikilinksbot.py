@@ -264,7 +264,6 @@ def linkformatter(link, conf):
             varfuncs = api["functionhooks"] + api["variables"]
             if "special" in varfuncs:
                 varfuncs.remove("special")
-            print(varfuncs)
             apinamespaces = api["namespaces"]
             namespaces = []
             templatens = "Template"
