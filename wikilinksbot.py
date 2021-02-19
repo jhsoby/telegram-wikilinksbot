@@ -5,6 +5,7 @@ import random
 import re
 import gc
 import bot_config
+
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
@@ -109,12 +110,15 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
     elif item[0] == "L": # Is the item a lexeme?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=info&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
+            labels = []
             try:
-                for lang in data["entities"][item]["lemmas"]:
+                lemmas = data["entities"][item]["lemmas"]
+                for lang in lemmas:
                     lemma = data["entities"][item]["lemmas"][lang]["value"]
                     language = data["entities"][item]["lemmas"][lang]["language"]
                     label = lemma + " [<code>" + language + "</code>]"
-                    return sep_override + " " + label
+                    labels.append(label)
+                return sep_override + " " + " / ".join(labels)
             except:
                 return False
     elif item[0] == "M": # Is the item a media item?
@@ -167,7 +171,7 @@ def resolveredirect(domain, link):
         return False
     else:
         return target
-        
+
 def interwiki(domain, link):
     """
     Returns domain and link target to enable direct links for interwiki links.
@@ -201,7 +205,7 @@ def translatable(domain, link):
     """
     Checks whether or not a page is translatable (thus whether or not it makes
     sense to add Special:MyLanguage in front of it).
-    
+
     (This API call could be improved if T265974 is acted upon.)
     """
     with urllib.request.urlopen(domain + "w/api.php?format=json&action=parse&prop=modules|jsconfigvars&page=" + urllib.parse.quote(link)) as apiresult:
