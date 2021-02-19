@@ -3,16 +3,8 @@ from telegram.ext import Updater, CommandHandler, MessageHandler, Filters
 import urllib.request, urllib.parse, json
 import random
 import re
-import logging
 import gc
 import bot_config
-
-# Setup logging
-logging.basicConfig(
-    # filename='example.log',
-    encoding='utf-8',
-    level=logging.DEBUG
-)
 
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
@@ -79,7 +71,6 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
     the lemma and language code for lexemes.
     Returns False if there is no label.
     """
-    logging.debug(f"processing:item:{item}:languages:{languages}")
     if not item:
         return False
     if force_lang:
@@ -122,15 +113,12 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
             labels = []
             try:
                 lemmas = data["entities"][item]["lemmas"]
-                logging.debug(f"lemmas:{lemmas}")
                 for lang in lemmas:
-                    logging.debug(f"lang:{lang}")
                     lemma = data["entities"][item]["lemmas"][lang]["value"]
-                    logging.debug(f"lemma:{lemma}")
                     language = data["entities"][item]["lemmas"][lang]["language"]
                     label = lemma + " [<code>" + language + "</code>]"
-                    labels.append(sep_override + " " + label)
-                return labels
+                    labels.append(label)
+                return sep_override + " " + " / ".join(labels)
             except:
                 return False
     elif item[0] == "M": # Is the item a media item?
