@@ -3,9 +3,9 @@
 This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q330574](https://www.wikidata.org/wiki/Q330574), [P31](https://www.wikidata.org/wiki/Property:P31) and [L158582](https://www.wikidata.org/wiki/Lexeme:L158582)) or Wikimedia Phabricator tasks (like [T39625](https://phabricator.wikimedia.org/T39625)) whenever they're used in chats.
 
 ## Features
-* Links [[wiki links]] mentioned in chat messages
-  * Links to redirects link directly to the target page and show its title
-  * Interwiki links link directly to the correct wiki
+* Links [[wiki links]] and {{templates}} mentioned in chat messages
+  * Links to redirects link directly to the target pages and show their titles
+  * Interwiki links link directly to the correct target sites
 * Links Wikidata entities mentioned in chat messages
   * You can also link specific properties in an entity, or to specific
   lexeme forms or senses
@@ -69,7 +69,7 @@ Set the label language order to Norwegian Bokmål, Norwegian Nynorsk, Swedish an
 
 #### Toggle link types
 ```
-/toggle (normallinks|wikibaselinks|phabricator|mylanguage) (on|off)
+/toggle (normallinks|wikibaselinks|phabricator|mylanguage|templates) (on|off)
 ```
 
 This command is used to turn on/off one of the link types. If all link types are turned off, the bot is essentially disabled. By default, all are turned on.

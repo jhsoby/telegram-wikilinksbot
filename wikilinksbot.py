@@ -8,7 +8,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?[\||\]]|\{\{.+?[\|\}]|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
@@ -40,7 +40,7 @@ messages = {
             "This will change the link settings for this entire chat, so use with caution."),
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
-            "<code>/toggle (normallinks|wikibaselinks|phabricator|mylanguage) (on|off)</code>\n\n"
+            "<code>/toggle (normallinks|wikibaselinks|phabricator|mylanguage|templates) (on|off)</code>\n\n"
             "By default all are turned on. If all are turned off, "
             "the bot will in effect be disabled."),
     "setlang_success": "✅ The language priority list for labels has now been changed to <code>{0}</code>.",
@@ -244,7 +244,7 @@ def linkformatter(link, conf):
     linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"], force_lang=force_lang) # Get the label for the item. Can be False if no appropriate label is found.
     if sectionlabel: # Get the label for the section that is linked to if possible
         sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
-    if (link[-1] == "|" or link[-1] == "]") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
+    if (link[0] == "[") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
         link = re.sub(r"[\[\]\|]", "", display)
         display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
         domain, link, iswiki = interwiki(conf["normallinks"], link)
@@ -254,6 +254,47 @@ def linkformatter(link, conf):
             if redirect:
                 url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
                 return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
+        return formatted.format(url, display, "")
+    if (link[0] == "{") and conf["toggle_templates"]: # Is this a template link?
+        link = re.sub(r"[\{\}\|]", "", display)
+        display = "&#123;&#123;" + link + "&#125;&#125;"
+        linkx = link.split(":")
+        with urllib.request.urlopen(conf["normallinks"] + "w/api.php?format=json&action=query&meta=siteinfo&siprop=functionhooks|variables|namespaces") as apiresult:
+            api = json.loads(apiresult.read().decode())["query"]
+            varfuncs = api["functionhooks"] + api["variables"]
+            if "special" in varfuncs:
+                varfuncs.remove("special")
+            print(varfuncs)
+            apinamespaces = api["namespaces"]
+            namespaces = []
+            templatens = "Template"
+            modulens = "Module"
+            for ns in apinamespaces:
+                if ns != "0":
+                    namespaces.append(apinamespaces[ns]["canonical"].lower())
+                    namespaces.append(apinamespaces[ns]["*"].lower())
+                    if apinamespaces[ns]["canonical"] == "Template":
+                        templatens = apinamespaces[ns]["*"]
+                    elif apinamespaces[ns]["canonical"] == "Module":
+                        modulens = apinamespaces[ns]["*"]
+        if (linkx[0].lower().strip() == "#invoke") and (len(linkx) > 1):
+            link = modulens + ":" + "".join(linkx[1:])
+        elif linkx[0].lower().strip() == "subst":
+            link = templatens + ":" + "".join(linkx[1:])
+        elif "#" in link:
+            return False
+        else:
+            if linkx[0].lower().strip() in varfuncs:
+                return False
+            elif linkx[0].lower().strip() in namespaces:
+                link = link
+            else:
+                link = templatens + ":" + link
+        url = conf["normallinks"] + "wiki/" + link
+        redirect = resolveredirect(conf["normallinks"], link)
+        if redirect:
+            url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_")
+            return formatted.format(url, display, "⮡ " + redirect)
         return formatted.format(url, display, "")
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
         url = conf["wikibaselinks"] + "entity/" + url
@@ -311,6 +352,7 @@ def getconfig(chat_id):
         "toggle_wikibaselinks": True,
         "toggle_phabricator": True,
         "toggle_mylanguage": True,
+        "toggle_templates": True,
         "language": "en"
     }
     with open("group_settings.json", "r") as settings:
@@ -358,7 +400,7 @@ def config(update, context):
             update.message.reply_text(text=messages["setwiki_error"], parse_mode="html")
     elif command == "/toggle" and len(message) >= 3:
         option = "toggle_" + message[1]
-        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links", "toggle_mylanguage": "Special:MyLanguage for [[wiki links]]"}
+        options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links", "toggle_mylanguage": "Special:MyLanguage for [[wiki links]]", "toggle_templates": "{{template}} links"}
         toggle = message[2]
         toggles = {"on": True, "off": False}
         if option in options and toggle in ["on", "off"]:
@@ -409,6 +451,7 @@ def config(update, context):
             "toggle_wikibaselinks": "Wikibase links are toggled {}",
             "toggle_phabricator": "Phabricator links are toggled {}",
             "toggle_mylanguage": "Special:MyLanguage for applicable links are toggled {}",
+            "toggle_templates": "Template links are toggled {}",
             "language": "The language priority list for labels is {}"
         }
         configlist = ["The following is the bot configuration for this chat. Settings in <b>bold</b> are different from the default setting.\n"]
