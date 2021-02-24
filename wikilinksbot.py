@@ -21,10 +21,10 @@ messages = {
             "and Phabricator tasks "
             "when they are mentioned in chats. I have the following configuration options, "
             "try any of them here to see how they work:\n\n"
-            "/setwiki - Change which wiki links point to\n"
-            "/setlang - Change which language to use for Wikidata labels\n"
-            "/toggle - Turn the link types on or off\n"
-            "/listconfig - Show the current configuration for this chat\n\n"
+            "/setwiki – Change which wiki links point to\n"
+            "/setlang – Change which language to use for Wikidata labels\n"
+            "/toggle – Turn the link types on or off\n"
+            "/listconfig – Show the current configuration for this chat\n\n"
             "If you don't like one of my messages, reply to it with <code>/delete</code>, "
             "and I will delete it. If I'm made administrator in a group, I will delete "
             "your <code>/delete</code> message as well!\n\n"
@@ -61,7 +61,13 @@ messages = {
     "permission_error": ("⛔️ Sorry, you do not have permission to change the bot configuration in this "
             "chat. Only group administrators or the bot's maintainers may change the configuration."),
     "delete_error": ("There's nothing I can delete. <b>Reply</b> to any of my messages "
-            "(including this one) with <code>/delete</code> to delete that message.")
+            "(including this one) with <code>/delete</code> to delete that message."),
+    "search_nothing": ("🤖 You gotta give me something to work with here! Type <code>/search</code> "
+            "followed by what you want to search for."),
+    "search_noresults": "🔎 No <a href=\"{0}\">results</a>. 😔",
+    "search_oneresult": "🔎 <b>Only</b> <a href=\"{0}\">result</a>:\n",
+    "search_allresults": "🔎 All <b>{0}</b> <a href=\"{1}\">results</a>:\n",
+    "search_results": "🔎 First <b>{0}</b> of <a href=\"{2}\">{1} results</a>:\n"
 }
 
 def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
@@ -359,6 +365,58 @@ def findlinks(update, context):
     if len(fmt_linklist) > 0:
         context.bot.send_message(chat_id=update.effective_chat.id, text="\n".join(fmt_linklist), disable_web_page_preview=True, disable_notification=True, parse_mode="html")
 
+def search(update, context):
+    """
+    Search feature. Searches for any query after the `/search` command. Default
+    amount of results returned is 3; optionally supply a number with `/search:x`
+    to return a different number of results.
+    """
+    conf = getconfig(update.effective_chat.id)
+    numbertosearchfor = 3
+    message = update.message.text.split(" ", 1)
+    returnmessage = ""
+    if len(message) == 1:
+        reply = messages["search_nothing"]
+        update.message.reply_html(text=reply)
+    else:
+        command, query = message
+        commandsplit = command.split(":")
+        resulturl = conf["normallinks"] + "wiki/Special:Search/" + urllib.parse.quote(query)
+        if len(commandsplit) > 1:
+            try:
+                numbertosearchfor = int(commandsplit[1])
+                if numbertosearchfor > 10:
+                    numbertosearchfor = 10
+            except:
+                pass
+        with urllib.request.urlopen(conf["normallinks"] + "w/api.php?format=json&action=query&list=search&srprop=&srlimit=" + str(numbertosearchfor) + "&srsearch=" + urllib.parse.quote(query)) as apiresult:
+            api = json.loads(apiresult.read().decode())["query"]
+            totalhits = api["searchinfo"]["totalhits"]
+            results = []
+            for hit in api["search"]:
+                hittitle = hit["title"]
+                if (conf["normallinks"] == "https://www.wikidata.org/") and (hit["ns"] in [0, 120, 146]):
+                    hittitle = re.sub(r"(Property|Lexeme):", "", hittitle)
+                else:
+                    hittitle = "[[" + hittitle + "]]"
+                results.append(linkformatter(hittitle, conf))
+            if totalhits < numbertosearchfor:
+                numbertosearchfor = totalhits
+            elif numbertosearchfor < 1:
+                numbertosearchfor = 1
+            if totalhits == 0:
+                returnmessage = messages["search_noresults"].format(resulturl)
+                update.message.reply_html(text=returnmessage, disable_web_page_preview=True)
+            elif totalhits == 1:
+                returnmessage = messages["search_oneresult"].format(resulturl)
+            elif numbertosearchfor == totalhits:
+                returnmessage = messages["search_allresults"].format(totalhits, resulturl)
+            else:
+                returnmessage = messages["search_results"].format(numbertosearchfor, totalhits, resulturl)
+            returnmessage += " • " + "\n • ".join(results)
+            if totalhits != 0:
+                update.message.reply_html(text=returnmessage, disable_web_page_preview=True)
+
 def getconfig(chat_id):
     """
     Checks if there is any group configuration for this group in group_settings.json,
@@ -523,14 +581,15 @@ def start(update, context):
 #echo_handler = CommandHandler('echo', echo)
 #updater.dispatcher.add_handler(echo_handler)
 
-
 link_handler = MessageHandler(Filters.regex(regex), findlinks)
 config_handler = CommandHandler(['setwiki', 'setlang', 'toggle', 'listconfig'], config)
+search_handler = CommandHandler('search', search)
 start_handler = CommandHandler(['start', 'help'], start)
 delete_handler = CommandHandler('delete', delete)
 
 updater.dispatcher.add_handler(link_handler)
 updater.dispatcher.add_handler(config_handler)
+updater.dispatcher.add_handler(search_handler)
 updater.dispatcher.add_handler(start_handler)
 updater.dispatcher.add_handler(delete_handler)
 try:

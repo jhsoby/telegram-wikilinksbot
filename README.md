@@ -13,6 +13,9 @@ This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q33
 * The bot can delete its own messages when they are replied to with `/delete`
   * It will also try to delete the message with the `/delete` command, but this
   only works if the bot has the right to delete messages (is group admin)
+* Search the group's wiki with `/search search query`. Default is the first 3
+  results; optionally return a different amount of results with `/search:x
+  search query` where `x` is any number between 1 and 10.
 * Changing the default URLs used for links in one group _(group admins only)_
 * Changing the language used for labels for Wikidata entities _(group admins only)_
 * Toggle which type of link the bot should post _(group admins only)_
