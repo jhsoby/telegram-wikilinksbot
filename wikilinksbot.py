@@ -9,7 +9,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?[\||\]]|\{\{.+?[\|\}]|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
 
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
@@ -64,7 +64,7 @@ messages = {
             "(including this one) with <code>/delete</code> to delete that message.")
 }
 
-def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
+def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
     """
     Gets the label from the Wikidata items/properties in question, in the
     language set in the configuration, with a fallback to English, or gets
@@ -75,8 +75,6 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
         return False
     if force_lang:
         force_lang = force_lang + "|"
-    else:
-        force_lang = ""
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
         with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
@@ -153,53 +151,43 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=False):
                 return False
     return False
 
-def resolveredirect(domain, link):
+def resolvetarget(domain, link):
     """
-    Checks [[normal links]] for whether or not they are redirects, and gets
-    the target title for the redirect page.
+    Checks [[normal links]] for whether or not they are redirects and whether
+    or not they are interwiki links.
     """
     target = link
-    with urllib.request.urlopen(domain + "w/api.php?action=query&titles=" + urllib.parse.quote(link) + "&redirects=1&format=json") as apiresult:
-        try:
-            api = json.loads(apiresult.read().decode())
-        except:
-            pass
-        else:
-            if ("query" in api) and ("redirects" in api["query"]):
-                target = api["query"]["redirects"][0]["to"]
-    if link == target:
-        return False
-    else:
-        return target
-
-def interwiki(domain, link):
-    """
-    Returns domain and link target to enable direct links for interwiki links.
-    """
     if not len(link):
-        return [domain, link, False]
+        return [domain, link, False, False]
     if link[0] == ":":
         link = link[1:]
     linksplit = link.split(":")
-    if len(linksplit) == 1:
-        return [domain, link, True]
-    with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&titles=" + urllib.parse.quote(link)) as apiresult:
+    with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&redirects=1&titles=" + urllib.parse.quote(link)) as apiresult:
         api = json.loads(apiresult.read().decode())["query"]
-        if "interwiki" in api:
+        if "redirects" in api:
+            target = api["redirects"][0]["to"]
+            if target == link:
+                return [domain, link, True, False]
+            else:
+                return [domain, link, True, target]
+        elif "normalized" in api:
+            target = api["normalized"][0]["to"]
+            return [domain, target, True, False]
+        elif "interwiki" in api:
             url_from_api = api["interwiki"][0]["url"]
             domainsplit = url_from_api.split("/")
             domain = "/".join(domainsplit[:3]) + "/"
             link = ":".join(linksplit[1:])
             if domainsplit[3] == "wiki":
-                return interwiki(domain, link)
+                return resolvetarget(domain, link)
             else:
-                parsed_link = urllib.parse.quote(link.replace(" ","_"))
+                parsed_link = urllib.parse.quote(link.replace(" ", "_"))
                 urlsplit = url_from_api.split(parsed_link)
                 domain = urlsplit[0]
                 link = link + urlsplit[1]
-                return [domain, link, False]
+                return [domain, link, False, False]
         else:
-            return [domain, link, True]
+            return [domain, link, True, False]
 
 def translatable(domain, link):
     """
@@ -219,112 +207,141 @@ def translatable(domain, link):
             else:
                 return False
     return False
+    
+def link_normal(link, domain, toggle_mylang=False):
+    """
+    Handles [[normal]] wiki links
+    """
+    target = re.sub(r"[\[\]]", "", link)
+    target = target.split("|")[0]
+    display = "&#91;&#91;" + target + "&#93;&#93;"
+    extra = ""
+    domain, target, iswiki, redirect = resolvetarget(domain, target)
+    if iswiki:
+        if redirect:
+            target = redirect
+            extra = "⮡ " + redirect
+        if toggle_mylang and translatable(domain, target):
+            target = "Special:MyLanguage/" + target
+        domain += "wiki/"
+    return {
+        "url": domain + target.replace(" ", "_"),
+        "display": display,
+        "extra": extra
+    }
+
+def link_template(link, domain):
+    """
+    Handles {{template}} links
+    """
+    target = re.sub(r"[\{\}]", "", link)
+    target = target.split("|")[0]
+    targetsplit = target.split(":")
+    targetsplit[0] = targetsplit[0].lower().strip()
+    display = "&#123;&#123;" + target + "&#125;&#125;"
+    extra = ""
+    namespaces = []
+    with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&meta=siteinfo&siprop=functionhooks|variables|namespaces") as apiresult:
+        api = json.loads(apiresult.read().decode())["query"]
+        varfuncs = api["functionhooks"] + api["variables"]
+        if "special" in varfuncs:
+            varfuncs.remove("special")
+        apinamespaces = api["namespaces"]
+        for ns in apinamespaces:
+            if ns != "0":
+                namespaces.append(apinamespaces[ns]["canonical"].lower())
+                namespaces.append(apinamespaces[ns]["*"].lower())
+    if (targetsplit[0] == "#invoke") and (len(targetsplit) > 1):
+        target = "Module:" + "".join(targetsplit[1:])
+    elif targetsplit[0] == "subst":
+        target = "Template:" + "".join(targetsplit[1:])
+    elif targetsplit[0] == "int":
+        target = "MediaWiki:" + "".join(targetsplit[1:])
+    elif ("#" in target) or (targetsplit[0] in varfuncs):
+        return False
+    elif targetsplit[0].lower() in namespaces:
+        target = target
+    else:
+        target = "Template:" + target
+    resolvedlink = resolvetarget(domain, target)
+    target = resolvedlink[1]
+    redirect = resolvedlink[3]
+    if redirect:
+        target = redirect
+        extra = "⮡ " + redirect
+    domain += "wiki/"
+    return {
+        "url": domain + target.replace(" ", "_"),
+        "display": display,
+        "extra": extra
+    }
+
+def link_item(link, domain, langconf):
+    result = {}
+    section = False
+    sectionlabel = False
+    force_lang = ""
+    display = link
+    target = link
+    if re.match(r"[QLPM]\d+#P\d+", link):
+        link, section  = link.split("#")
+        sectionlabel = True
+    elif re.match(r"L\d+-[SF]\d+", link):
+        link, section = link.split("-")
+        display = link + "-" + section
+        target = link + "#" + section
+        sectionlabel = True
+    elif re.match(r"T\d+#\d+", link):
+        link, section = link.split("#")
+    elif ("@" in link):
+        link, force_lang = link.split("@")
+        display = link
+        target = link
+        result["force_lang"] = force_lang
+    linklabel = labelfetcher(link, langconf, domain, force_lang=force_lang)
+    if sectionlabel:
+        sectionlabel = (labelfetcher(section, langconf, domain, sep_override=" →") or " → " + section)
+    if section:
+        if linklabel:
+            linklabel += sectionlabel
+        else:
+            linklabel = sectionlabel
+    if link[0] == "M":
+        result["url"] = "https://commons.wikimedia.org/entity/" + target
+    elif link[0] == "T":
+        result["url"] = "https://phabricator.wikimedia.org/" + target
+    elif link[0] == "E":
+        result["url"] = domain + "wiki/EntitySchema:" + target
+    else:
+        result["url"] = domain + "entity/" + target
+    result["display"] = display
+    result["extra"] = (linklabel or "")
+    return result
 
 def linkformatter(link, conf):
     """
     Formats a single link in the correct way.
     """
-    section = False
-    sectionlabel = False
-    force_lang = False
-    display = link # The text that will be displayed, i.e. <a>display</a>
-    url = link # The url we will link to, i.e. <a href="url">display</a>
-    formatted = "<a href=\"{0}\">{1}</a> {2}"
-    if re.match(r"[QLPM]\d+#P\d+", link): # Is the link to a statement in an item?
-        link, section = link.split("#")
-        sectionlabel = True
-    elif re.match(r"T\d+#\d+", link):
-        link, section = link.split("#")
-    elif re.match(r"L\d+-[SF]\d+", link): # Is the link to a specific form of a lexeme?
-        link, section = link.split("-")
-        display = link + "-" + section
-        url = link + "#" + section
-        sectionlabel = True
-    elif "@" in link:
-        link, force_lang = link.split("@")
-        display = link
-        formatted = "<a href=\"{0}\">{1}</a><code>@" + force_lang + "</code> {2}"
-        url = link
-    linklabel = labelfetcher(link, conf["language"], conf["wikibaselinks"], force_lang=force_lang) # Get the label for the item. Can be False if no appropriate label is found.
-    if sectionlabel: # Get the label for the section that is linked to if possible
-        sectionlabel = (labelfetcher(section, conf["language"], conf["wikibaselinks"], sep_override=" →") or " → " + section)
-    if (link[0] == "[") and conf["toggle_normallinks"]: # Is this a normal [[wiki link]]?
-        link = re.sub(r"[\[\]\|]", "", display)
-        display = "&#91;&#91;" + link + "&#93;&#93;" # HTML-escaped [[link]]
-        domain, link, iswiki = interwiki(conf["normallinks"], link)
-        url = domain + ("wiki/" if iswiki else "") + ("Special:MyLanguage/" if iswiki and conf["toggle_mylanguage"] and translatable(domain, link) else "") + link.replace(" ", "_") # Replaces spaces with underscores
-        if iswiki:
-            redirect = resolveredirect(domain, link) # Check if the link is actually a redirect
-            if redirect:
-                url = domain + "wiki/" + redirect.replace(" ", "_") # Link to the redirect target instead
-                return formatted.format(url, display, "⮡ " + redirect) # Include info on which page the link redirects to
-        return formatted.format(url, display, "")
-    if (link[0] == "{") and conf["toggle_templates"]: # Is this a template link?
-        link = re.sub(r"[\{\}\|]", "", display)
-        display = "&#123;&#123;" + link + "&#125;&#125;"
-        linkx = link.split(":")
-        with urllib.request.urlopen(conf["normallinks"] + "w/api.php?format=json&action=query&meta=siteinfo&siprop=functionhooks|variables|namespaces") as apiresult:
-            api = json.loads(apiresult.read().decode())["query"]
-            varfuncs = api["functionhooks"] + api["variables"]
-            if "special" in varfuncs:
-                varfuncs.remove("special")
-            apinamespaces = api["namespaces"]
-            namespaces = []
-            templatens = "Template"
-            modulens = "Module"
-            for ns in apinamespaces:
-                if ns != "0":
-                    namespaces.append(apinamespaces[ns]["canonical"].lower())
-                    namespaces.append(apinamespaces[ns]["*"].lower())
-                    if apinamespaces[ns]["canonical"] == "Template":
-                        templatens = apinamespaces[ns]["*"]
-                    elif apinamespaces[ns]["canonical"] == "Module":
-                        modulens = apinamespaces[ns]["*"]
-        if (linkx[0].lower().strip() == "#invoke") and (len(linkx) > 1):
-            link = modulens + ":" + "".join(linkx[1:])
-        elif linkx[0].lower().strip() == "subst":
-            link = templatens + ":" + "".join(linkx[1:])
-        elif "#" in link:
-            return False
+    formatted = "<a href=\"{0[url]}\">{0[display]}</a> {0[extra]}"
+    formatted_at = "<a href=\"{0[url]}\">{0[display]}</a><code>@{0[force_lang]}</code> {0[extra]}"
+    if (link[0] == "[") and conf["toggle_normallinks"]:
+        return formatted.format(link_normal(link, conf["normallinks"], conf["toggle_mylanguage"]))
+    if (link[0] == "{") and conf["toggle_templates"]:
+        return formatted.format(link_template(link, conf["normallinks"]))
+    elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]:
+        linkhandler = link_item(link, conf["wikibaselinks"], conf["language"])
+        if "force_lang" in linkhandler:
+            return formatted_at.format(linkhandler)
         else:
-            if linkx[0].lower().strip() in varfuncs:
-                return False
-            elif linkx[0].lower().strip() in namespaces:
-                link = link
-            else:
-                link = templatens + ":" + link
-        url = conf["normallinks"] + "wiki/" + link
-        redirect = resolveredirect(conf["normallinks"], link)
-        if redirect:
-            url = conf["normallinks"] + "wiki/" + redirect.replace(" ", "_")
-            return formatted.format(url, display, "⮡ " + redirect)
-        return formatted.format(url, display, "")
-    elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]: # Is the link a Wikibase entity?
-        url = conf["wikibaselinks"] + "entity/" + url
-        if link[0] == "E": # Remove this if/when EntitySchema links work with entity/ URLs
-            url = url.replace("entity/", "wiki/EntitySchema:")
-        if section:
-            if linklabel:
-                linklabel += sectionlabel
-            else:
-                linklabel = sectionlabel
-        if linklabel:
-            return formatted.format(url, display, linklabel)
-        else:
-            return formatted.format(url, display, "")
+            return formatted.format(linkhandler)
     elif (link[0] == "M") and conf["toggle_wikibaselinks"]: # should have its own toggle
-        url = "https://commons.wikimedia.org/" + "entity/" + url # could be made configurable eventually
-        return formatted.format(url, display, linklabel or "")
+        return formatted.format(link_item(link, conf["wikibaselinks"], conf["language"]))
     elif (link[0] == "T") and conf["toggle_phabricator"]: # Is the link to a Phabricator task?
-        url = "https://phabricator.wikimedia.org/" + url # Hardcoded. Can't be bothered to add config for this atm
-        if linklabel:
-            return formatted.format(url, display, linklabel)
-        else:
-            return formatted.format(url, display, "")
+        return formatted.format(link_item(link, conf["wikibaselinks"], conf["language"]))
     else:
         return False
 
-def link(update, context):
+def findlinks(update, context):
     """
     Finds all potential links in a message. The regex looks for [[links]],
     including [[links|like this]], and Wikidata entities just casually mentioned.
@@ -507,7 +524,7 @@ def start(update, context):
 #updater.dispatcher.add_handler(echo_handler)
 
 
-link_handler = MessageHandler(Filters.regex(regex), link)
+link_handler = MessageHandler(Filters.regex(regex), findlinks)
 config_handler = CommandHandler(['setwiki', 'setlang', 'toggle', 'listconfig'], config)
 start_handler = CommandHandler(['start', 'help'], start)
 delete_handler = CommandHandler('delete', delete)
