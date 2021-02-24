@@ -259,7 +259,7 @@ def link_template(link, domain):
         target = "MediaWiki:" + "".join(targetsplit[1:])
     elif ("#" in target) or (targetsplit[0] in varfuncs):
         return False
-    elif targetsplit[0].lower() in namespaces:
+    elif ((targetsplit[0].lower() in namespaces) and (len(targetsplit) > 1)) or (target[0] == ":"):
         target = target
     else:
         target = "Template:" + target
