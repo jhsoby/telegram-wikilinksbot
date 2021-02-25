@@ -333,7 +333,11 @@ def linkformatter(link, conf):
     if (link[0] == "[") and conf["toggle_normallinks"]:
         return formatted.format(link_normal(link, conf["normallinks"], conf["toggle_mylanguage"]))
     if (link[0] == "{") and conf["toggle_templates"]:
-        return formatted.format(link_template(link, conf["normallinks"]))
+        linkhandler = link_template(link, conf["normallinks"])
+        if linkhandler:
+            return formatted.format(linkhandler)
+        else:
+            return False
     elif (link[0] in "QPLE") and conf["toggle_wikibaselinks"]:
         linkhandler = link_item(link, conf["wikibaselinks"], conf["language"])
         if "force_lang" in linkhandler:
