@@ -11,6 +11,12 @@ updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
 regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
 
+# Load the group settings file once for every time the script is run.
+# If any settings change, global_conf will be set again.
+global_conf = {}
+with open("group_settings.json", "r") as settings:
+    global_conf = json.load(settings)
+
 messages = {
     "start-group": ("🤖 Hello! I am a bot that links [[wiki links]], Wikidata "
             "entities and optionally Phabricator tasks when they are mentioned in chats. You can "
@@ -437,11 +443,9 @@ def getconfig(chat_id):
         "toggle_templates": True,
         "language": "en"
     }
-    with open("group_settings.json", "r") as settings:
-        settings = json.load(settings)
-        if chat_id in settings:
-            for x in settings[chat_id]:
-                conf[x] = settings[chat_id][x]
+    if chat_id in global_conf:
+        for x in global_conf[chat_id]:
+            conf[x] = global_conf[chat_id][x]
     return conf
 
 def config(update, context):
@@ -555,6 +559,9 @@ def config(update, context):
     else:
         errortext = messages[command[1:] + "_error"]
         update.message.reply_text(text=errortext, parse_mode="html")
+    with open("group_settings.json", "r") as settings:
+        global global_conf
+        global_conf = json.load(settings)
 
 def delete(update, context):
     """
