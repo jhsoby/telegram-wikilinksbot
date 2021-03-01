@@ -108,7 +108,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
                 for lang in priority_languages[::-1]: # Go through the list of priority languages from the back, and set whatever language that has a label as the label instead of the randomly chosen one
                     if lang in present_labels:
                         labellang = lang
-                label = present_labels[labellang]["value"]
+                label = present_labels[labellang]["value"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
                 if not labellang == priority_languages[0]: # If the final label language is not the first in the priority list, attach the language code for the chosen label
                     label += " [<code>" + labellang + "</code>]"
                 if (
@@ -117,7 +117,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
                     or re.match(r"\w", sep)
                 ): # Check if the emoji is probably an emoji, and not some other character
                     sep = sep_override
-                return sep + " " + label.replace("&", "&amp;")
+                return sep + " " + label
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
@@ -240,6 +240,7 @@ def link_normal(link, site, toggle_mylang=False):
         if toggle_mylang and translatable(site, target):
             target = "Special:MyLanguage/" + target
         domain += site["articlepath"]
+    target = target.replace("\"", "%22")
     return {
         "url": domain + target.replace(" ", "_"),
         "display": display,
@@ -285,6 +286,7 @@ def link_template(link, site):
     if redirect:
         target = redirect
         extra = "⮡ " + redirect
+    target = target.replace("\"", "%22")
     return {
         "url": site["baseurl"] + site["articlepath"] + target.replace(" ", "_"),
         "display": display,
