@@ -39,11 +39,14 @@ messages = {
             "Feel free to report any issues you may have with me there! 😊"
             "If you just have some questions, feel free to ask my creator, @jhsoby."),
     "setwiki_success": "✅ The URL for {0} has been updated to {1} for this chat.",
+    "setwiki_invalid": ("❌ I am not able to recognize that URL as a MediaWiki wiki.\n\n"
+            "Please check that you entered the URL correctly. If you believe this "
+            "is an error in the bot, please feel free to "
+            "<a href=\"https://github.com/jhsoby/telegram-wikilinksbot/issues/new\">report it</a>."),
     "setwiki_error": ("The format for the /setwiki command is:\n"
-            "<code>/setwiki (normallinks|wikibaselinks) https://$URL/</code>\n\n"
-            "The URL must be the base domain for the wiki, and wikis are assumed "
-            "to follow the Wikimedia convention where content is at <code>$URL/wiki/</code> "
-            "and the API is available at <code>$URL/w/api.php</code>.\n\n"
+            "<code>/setwiki (normallinks|wikibaselinks) https://$URL</code>\n\n"
+            "The URL has to be a wiki, and it has to be openly accessible on "
+            "the web.\n\n"
             "This will change the link settings for this entire chat, so use with caution."),
     "toggle_success": "✅ Linking of {0} has been turned <b>{1}</b> for this chat.",
     "toggle_error": ("The format for the /toggle command is:\n"
@@ -88,11 +91,11 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
     if force_lang:
         force_lang = force_lang + "|"
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
-        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=labels&format=json&ids=" + item) as url:
+        with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?action=wbgetentities&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
             sep = sep_override
-            if item[0] == "Q": # Easter egg! Check if the item has P487 (normally an emoji) set, and use that instead of the separator if there is one.
-                with urllib.request.urlopen(wb + "w/api.php?action=wbgetclaims&entity=" + item + "&property=P487&format=json") as emoji:
+            if item[0] == "Q" and wb["baseurl"] == "https://www.wikidata.org": # Easter egg! Check if the item has P487 (normally an emoji) set, and use that instead of the separator if there is one.
+                with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?action=wbgetclaims&entity=" + item + "&property=P487&format=json") as emoji:
                     emojidata = json.loads(emoji.read().decode())
                     if "claims" in emojidata:
                         if "P487" in emojidata["claims"]:
@@ -118,7 +121,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
-        with urllib.request.urlopen(wb + "w/api.php?action=wbgetentities&props=info&format=json&ids=" + item) as url:
+        with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?action=wbgetentities&props=info&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
             labels = []
             try:
@@ -143,7 +146,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
         # Should be replaced when EntitySchemas' terms are more
         # readily accessible via the API.
         language = languages.split("|")[0]
-        with urllib.request.urlopen(wb + "w/api.php?format=json&action=parse&uselang=" + language + "&page=EntitySchema:" + item) as url:
+        with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?format=json&action=parse&uselang=" + language + "&page=EntitySchema:" + item) as url:
             data = json.loads(url.read().decode())
             try:
                 title = data["parse"]["displaytitle"]
@@ -163,18 +166,19 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
                 return False
     return False
 
-def resolvetarget(domain, link):
+def resolvetarget(site, link):
     """
     Checks [[normal links]] for whether or not they are redirects and whether
     or not they are interwiki links.
     """
     target = link
+    domain = site["baseurl"]
     if not len(link):
         return [domain, link, False, False]
     if link[0] == ":":
         link = link[1:]
     linksplit = link.split(":")
-    with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&iwurl=1&redirects=1&titles=" + urllib.parse.quote(link)) as apiresult:
+    with urllib.request.urlopen(site["baseurl"] + site["apipath"] + "?format=json&action=query&iwurl=1&redirects=1&titles=" + urllib.parse.quote(link)) as apiresult:
         api = json.loads(apiresult.read().decode())["query"]
         if "redirects" in api:
             target = api["redirects"][0]["to"]
@@ -188,10 +192,10 @@ def resolvetarget(domain, link):
         elif "interwiki" in api:
             url_from_api = api["interwiki"][0]["url"]
             domainsplit = url_from_api.split("/")
-            domain = "/".join(domainsplit[:3]) + "/"
+            domain = "/".join(domainsplit[:3])
             link = ":".join(linksplit[1:])
             if domainsplit[3] == "wiki":
-                return resolvetarget(domain, link)
+                return resolvetarget({"baseurl": domain, "apipath": "/w/api.php"}, link)
             else:
                 parsed_link = urllib.parse.quote(link.replace(" ", "_"))
                 urlsplit = url_from_api.split(parsed_link)
@@ -208,7 +212,7 @@ def translatable(domain, link):
 
     (This API call could be improved if T265974 is acted upon.)
     """
-    with urllib.request.urlopen(domain + "w/api.php?format=json&action=parse&prop=modules|jsconfigvars&page=" + urllib.parse.quote(link)) as apiresult:
+    with urllib.request.urlopen(domain["baseurl"] + domain["apipath"] + "?format=json&action=parse&prop=modules|jsconfigvars&page=" + urllib.parse.quote(link)) as apiresult:
         try:
             api = json.loads(apiresult.read().decode())
         except:
@@ -219,8 +223,8 @@ def translatable(domain, link):
             else:
                 return False
     return False
-    
-def link_normal(link, domain, toggle_mylang=False):
+
+def link_normal(link, site, toggle_mylang=False):
     """
     Handles [[normal]] wiki links
     """
@@ -228,21 +232,21 @@ def link_normal(link, domain, toggle_mylang=False):
     target = target.split("|")[0]
     display = "&#91;&#91;" + target + "&#93;&#93;"
     extra = ""
-    domain, target, iswiki, redirect = resolvetarget(domain, target)
+    domain, target, iswiki, redirect = resolvetarget(site, target)
     if iswiki:
         if redirect:
             target = redirect
             extra = "⮡ " + redirect
-        if toggle_mylang and translatable(domain, target):
+        if toggle_mylang and translatable(site, target):
             target = "Special:MyLanguage/" + target
-        domain += "wiki/"
+        domain += site["articlepath"]
     return {
         "url": domain + target.replace(" ", "_"),
         "display": display,
         "extra": extra
     }
 
-def link_template(link, domain):
+def link_template(link, site):
     """
     Handles {{template}} links
     """
@@ -253,7 +257,7 @@ def link_template(link, domain):
     display = "&#123;&#123;" + target + "&#125;&#125;"
     extra = ""
     namespaces = []
-    with urllib.request.urlopen(domain + "w/api.php?format=json&action=query&meta=siteinfo&siprop=functionhooks|variables|namespaces") as apiresult:
+    with urllib.request.urlopen(site["baseurl"] + site["apipath"] + "?format=json&action=query&meta=siteinfo&siprop=functionhooks|variables|namespaces") as apiresult:
         api = json.loads(apiresult.read().decode())["query"]
         varfuncs = api["functionhooks"] + api["variables"]
         if "special" in varfuncs:
@@ -275,20 +279,19 @@ def link_template(link, domain):
         target = target
     else:
         target = "Template:" + target
-    resolvedlink = resolvetarget(domain, target)
+    resolvedlink = resolvetarget(site, target)
     target = resolvedlink[1]
     redirect = resolvedlink[3]
     if redirect:
         target = redirect
         extra = "⮡ " + redirect
-    domain += "wiki/"
     return {
-        "url": domain + target.replace(" ", "_"),
+        "url": site["baseurl"] + site["articlepath"] + target.replace(" ", "_"),
         "display": display,
         "extra": extra
     }
 
-def link_item(link, domain, langconf):
+def link_item(link, site, langconf):
     result = {}
     section = False
     sectionlabel = False
@@ -310,9 +313,9 @@ def link_item(link, domain, langconf):
         display = link
         target = link
         result["force_lang"] = force_lang
-    linklabel = labelfetcher(link, langconf, domain, force_lang=force_lang)
+    linklabel = labelfetcher(link, langconf, site, force_lang=force_lang)
     if sectionlabel:
-        sectionlabel = (labelfetcher(section, langconf, domain, sep_override=" →") or " → " + section)
+        sectionlabel = (labelfetcher(section, langconf, site, sep_override=" →") or " → " + section)
     if section:
         if linklabel:
             linklabel += sectionlabel
@@ -323,9 +326,9 @@ def link_item(link, domain, langconf):
     elif link[0] == "T":
         result["url"] = "https://phabricator.wikimedia.org/" + target
     elif link[0] == "E":
-        result["url"] = domain + "wiki/EntitySchema:" + target
+        result["url"] = site["baseurl"] + "/wiki/EntitySchema:" + target
     else:
-        result["url"] = domain + "entity/" + target
+        result["url"] = site["baseurl"] + site["entitypath"] + target
     result["display"] = display
     result["extra"] = (linklabel or "")
     return result
@@ -391,7 +394,7 @@ def search(update, context):
     else:
         command, query = message
         commandsplit = command.split(":")
-        resulturl = conf["normallinks"] + "wiki/Special:Search/" + urllib.parse.quote(query)
+        resulturl = conf["normallinks"]["baseurl"] + conf["normallinks"]["articlepath"] + "Special:Search/" + urllib.parse.quote(query)
         if len(commandsplit) > 1:
             try:
                 numbertosearchfor = int(commandsplit[1])
@@ -399,13 +402,13 @@ def search(update, context):
                     numbertosearchfor = 10
             except:
                 pass
-        with urllib.request.urlopen(conf["normallinks"] + "w/api.php?format=json&action=query&list=search&srprop=&srlimit=" + str(numbertosearchfor) + "&srsearch=" + urllib.parse.quote(query)) as apiresult:
+        with urllib.request.urlopen(conf["normallinks"]["baseurl"] + conf["normallinks"]["apipath"] + "?format=json&action=query&list=search&srprop=&srlimit=" + str(numbertosearchfor) + "&srsearch=" + urllib.parse.quote(query)) as apiresult:
             api = json.loads(apiresult.read().decode())["query"]
             totalhits = api["searchinfo"]["totalhits"]
             results = []
             for hit in api["search"]:
                 hittitle = hit["title"]
-                if (conf["normallinks"] == "https://www.wikidata.org/") and (hit["ns"] in [0, 120, 146]):
+                if (conf["normallinks"]["baseurl"] == "https://www.wikidata.org") and (hit["ns"] in [0, 120, 146]):
                     hittitle = re.sub(r"(Property|Lexeme):", "", hittitle)
                 else:
                     hittitle = "[[" + hittitle + "]]"
@@ -434,8 +437,16 @@ def getconfig(chat_id):
     """
     chat_id = str(chat_id)
     conf = { # Default configuration
-        "normallinks": "https://en.wikipedia.org/",
-        "wikibaselinks": "https://www.wikidata.org/",
+        "normallinks": {
+            "baseurl": "https://en.wikipedia.org",
+            "articlepath": "/wiki/",
+            "apipath": "/w/api.php"
+            },
+        "wikibaselinks": {
+            "baseurl": "https://www.wikidata.org",
+            "entitypath": "/entity/",
+            "apipath": "/w/api.php"
+            },
         "toggle_normallinks": True,
         "toggle_wikibaselinks": True,
         "toggle_phabricator": True,
@@ -469,21 +480,45 @@ def config(update, context):
     if command == "/setwiki" and len(message) >= 3:
         option = message[1]
         options = {"normallinks": "normal [[wiki links]]", "wikibaselinks": "Wikibase entity links"}
-        wikiurl = message[2]
-        if option in options and re.match(r"https?:\/\/\w+(\.\w+)*?\/", wikiurl):
-            with open("group_settings.json", "r+") as f:
-                settings = json.load(f)
-                if chat_id in settings:
-                    settings[chat_id][option] = wikiurl
-                else:
-                    settings[chat_id] = {option: wikiurl}
-                f.seek(0)
-                json.dump(settings, f, indent=4)
-                f.truncate()
-            successtext = messages["setwiki_success"].format(options[option], wikiurl)
-            update.message.reply_text(text=successtext, disable_web_page_preview=True)
+        inputurl = message[2]
+        if (option not in options) or not inputurl.startswith("http"):
+            update.message.reply_html(text=messages["setwiki_error"])
         else:
-            update.message.reply_text(text=messages["setwiki_error"], parse_mode="html")
+            inputurl = re.sub(r"/$", "", inputurl)
+            articlepath = "/wiki/"
+            validurlentered = False
+            for wikiurl in [inputurl + articlepath, inputurl + "/", inputurl.rpartition("/")[0] + "/", inputurl.rpartition("=")[0] + "="]:
+                try:
+                    urlblob = "Special:ExpandTemplates?wpInput=(articlepath:{{ARTICLEPATH}})(scriptpath:{{SCRIPTPATH}})"
+                    if "?" in wikiurl:
+                        urlblob = urlblob.replace("?", "&")
+                    with urllib.request.urlopen(wikiurl + urlblob) as url:
+                        rendered = url.read().decode()
+                        pathsfound = re.search(r"id=\"output\".+?\(articlepath:(.+?)\)\(scriptpath:(.+?)?\)", rendered)
+                        wikiurl = "/".join(wikiurl.split("/")[:3])
+                        articlepath = pathsfound.group(1).replace("$1", "")
+                        apipath = pathsfound.group(2) or ""
+                        apipath = ("/" + apipath + "/api.php").replace("//", "/")
+                        linksetting = {"baseurl": wikiurl, "articlepath": articlepath, "apipath": apipath}
+                        if option == "wikibaselinks":
+                            linksetting = {"baseurl": wikiurl, "entitypath": "/entity/", "apipath": apipath}
+                    with open("group_settings.json", "r+") as f:
+                        settings = json.load(f)
+                        if chat_id in settings:
+                            settings[chat_id][option] = linksetting
+                        else:
+                            settings[chat_id] = {option: linksetting}
+                        f.seek(0)
+                        json.dump(settings, f, indent=4)
+                        f.truncate()
+                    validurlentered = True
+                    successtext = messages["setwiki_success"].format(options[option], wikiurl)
+                    update.message.reply_html(text=successtext, disable_web_page_preview=True)
+                    break
+                except:
+                    pass
+            if not validurlentered:
+                update.message.reply_html(text=messages["setwiki_invalid"], disable_web_page_preview=True)
     elif command == "/toggle" and len(message) >= 3:
         option = "toggle_" + message[1]
         options = {"toggle_normallinks": "normal [[wiki links]]", "toggle_wikibaselinks": "Wikibase entity links", "toggle_phabricator": "Phabricator links", "toggle_mylanguage": "Special:MyLanguage for [[wiki links]]", "toggle_templates": "{{template}} links"}
@@ -545,12 +580,16 @@ def config(update, context):
         thisconfig = getconfig(update.effective_chat.id) # Get config for this chat
         for k in defaultconfig:
             if defaultconfig[k] == thisconfig[k]:
-                if type(thisconfig[k]) is not bool:
+                if k in ["normallinks", "wikibaselinks"]:
+                    configlist.append("· " + configexplanations[k].format(thisconfig[k]["baseurl"]) + " (<i>default</i>)")
+                elif type(thisconfig[k]) is not bool:
                     configlist.append("· " + configexplanations[k].format(thisconfig[k]) + " (<i>default</i>)")
                 else:
                     configlist.append("· " + configexplanations[k].format(onoff[str(thisconfig[k])]) + " (<i>default</i>)")
             else:
-                if type(thisconfig[k]) is not bool:
+                if k in ["normallinks", "wikibaselinks"]:
+                    configlist.append("· <b>" + configexplanations[k].format(thisconfig[k]["baseurl"]) + "</b>")
+                elif type(thisconfig[k]) is not bool:
                     configlist.append("· <b>" + configexplanations[k].format(thisconfig[k]) + "</b>")
                 else:
                     configlist.append("· <b>" + configexplanations[k].format(onoff[str(thisconfig[k])]) + "</b>")

@@ -16,6 +16,7 @@ This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q33
 * Search the group's wiki with `/search search query`. Default is the first 3
   results; optionally return a different amount of results with `/search:x
   search query` where `x` is any number between 1 and 10.
+* Can link practically any publically available wiki.
 * Changing the default URLs used for links in one group _(group admins only)_
 * Changing the language used for labels for Wikidata entities _(group admins only)_
 * Toggle which type of link the bot should post _(group admins only)_
@@ -38,17 +39,25 @@ The commands can only be used by group administrators or bot maintainers, in ord
 /setwiki (normallinks|wikibaselinks) https://URL/
 ```
 
-This command is used for changing the URL links point to. The default is [https://en.wikipedia.org/](https://en.wikipedia.org/) for [[normal links]] and [https://www.wikidata.org/](https://www.wikidata.org/) for Wikibase links. You can link other wikis like you would on-wiki using normal Wikimedia prefixes (e.g. [\[\[c:Special:UploadWizard\]\]](https://commons.wikimedia.org/wiki/Special:UploadWizard) or [\[\[de:Schadenfreude\]\]](https://de.wikipedia.org/wiki/Schadenfreude)).
+This command is used for changing the URL links point to. The default is [https://en.wikipedia.org/](https://en.wikipedia.org/) for [[normal links]] and [https://www.wikidata.org/](https://www.wikidata.org/) for Wikibase links. You can link other wikis like you would on-wiki using interwiki prefixes (e.g. [\[\[c:Special:UploadWizard\]\]](https://commons.wikimedia.org/wiki/Special:UploadWizard) or [\[\[de:Schadenfreude\]\]](https://de.wikipedia.org/wiki/Schadenfreude)).
 
-URLs are assumed to follow the standard Wikimedia naming scheme where pages are found at https://URL/wiki/_page_ and the API is accessed at https://URL/w/api.php.
+Practically any publically available MediaWiki wiki can be set as the target wiki. If the wiki follows an unusual URL scheme (i.e. something other than `$URL/wiki/Pagename`), try using the URL of a page on the wiki when setting this option.
 
-**Example:**  
-Set [[normal links]] to link to the Shawiya Wiktionary.
+**Examples:**  
+Set [[normal links]] to link to the Shawiya Wiktionary:
 ```
-/setwiki normallinks https://shy.wiktionary.org/
+/setwiki normallinks https://shy.wiktionary.org
+```
+Set [[normal links]] to link to the Minecraft Gamepedia:
+```
+/setwiki normallinks https://minecraft.gamepedia.com
+```
+Set Wikibase links to link to the Open Street Map wiki:
+```
+/setwiki wikibaselinks https://wiki.openstreetmap.org/
 ```
 
-#### Change the language priority used for Wikidata labels
+#### Change the language priority used for Wikibase labels
 ```
 /setlang language-code
 /setlang language-code-1|language-code-2|language-code-3
@@ -58,7 +67,7 @@ This command is used for changing what language Wikidata labels are fetched in. 
 
 If an item doesn't have a label in any of the priority languages (or English), the bot will pick a label at random. If you want show the label in a specific language as a one-off, you can use the syntax `Q1234@langcode`, e.g. `Q20@se` will show "Q20 – Norga" no matter what language priority is set for the chat.
 
-For this to work, the language code(s) must be supported by MediaWiki (see [list in the API](https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages)), but the bot doesn't validate the language code except for a simple regex which checks if it could _theoretically_ be a valid languaged code.
+For this to work, the language code(s) must be supported by MediaWiki (see [list in the API](https://www.wikidata.org/w/api.php?action=query&meta=siteinfo&siprop=languages)), but the bot doesn't validate the language code except for a simple regex which checks if it could _theoretically_ be a valid language code.
 
 **Examples:**  
 Set the label language to Persian:
@@ -75,12 +84,12 @@ Set the label language order to Norwegian Bokmål, Norwegian Nynorsk, Swedish an
 /toggle (normallinks|wikibaselinks|phabricator|mylanguage|templates) (on|off)
 ```
 
-This command is used to turn on/off one of the link types. If all link types are turned off, the bot is essentially disabled. By default, all are turned on.
+This command is used to turn one of the link types on or off. If all link types are turned off, the bot is essentially disabled. By default, all are turned on.
 
 `mylanguage` toggles whether or not links should be prefixed with "Special:MyLanguage/". When toggled on, this will only happen for links to translatable pages.
 
 **Example:**  
-Disable Wikidata links:
+Disable Wikibase links:
 ```
 /toggle wikibaselinks off
 ```
