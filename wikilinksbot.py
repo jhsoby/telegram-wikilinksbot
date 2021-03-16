@@ -170,6 +170,11 @@ def resolvetarget(site, link):
     """
     Checks [[normal links]] for whether or not they are redirects and whether
     or not they are interwiki links.
+    
+    Returns a list where the first item is the domain to link to, the second is
+    the link title, the third is a boolean of whether or not the target site
+    is a wiki, and the fourth is False if the page is not a redirect, or the
+    redirect target if the page is a redirect.
     """
     target = link
     domain = site["baseurl"]
@@ -240,9 +245,9 @@ def link_normal(link, site, toggle_mylang=False):
         if toggle_mylang and translatable(site, target):
             target = "Special:MyLanguage/" + target
         domain += site["articlepath"]
-    target = target.replace("\"", "%22")
+    target = target.replace("\"", "%22").replace("?", "%3F").replace(" ", "_")
     return {
-        "url": domain + target.replace(" ", "_"),
+        "url": domain + target,
         "display": display,
         "extra": extra
     }
@@ -286,9 +291,9 @@ def link_template(link, site):
     if redirect:
         target = redirect
         extra = "⮡ " + redirect
-    target = target.replace("\"", "%22")
+    target = target.replace("\"", "%22").replace("?", "%3F").replace(" ", "_")
     return {
-        "url": site["baseurl"] + site["articlepath"] + target.replace(" ", "_"),
+        "url": site["baseurl"] + site["articlepath"] + target,
         "display": display,
         "extra": extra
     }

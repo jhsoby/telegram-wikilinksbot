@@ -1,3 +1,4 @@
 bot_config.py
 group_settings.json
 __pycache__/*
+group_settings_backup/*
