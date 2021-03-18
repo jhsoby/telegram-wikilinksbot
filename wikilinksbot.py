@@ -9,7 +9,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-x-Q\d+|(-\w{2,4}){0,2}))?|T[1-9]\d*(#[1-9]\d*)?))")
 
 # Load the group settings file once for every time the script is run.
 # If any settings change, global_conf will be set again.
@@ -88,8 +88,6 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
     """
     if not item:
         return False
-    if force_lang:
-        force_lang = force_lang + "|"
     if item[0] in ["Q", "P"]: # Is the entity an item or property?
         with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?action=wbgetentities&props=labels&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
@@ -102,6 +100,8 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
                             if emojidata["claims"]["P487"][0]["mainsnak"]["snaktype"] == "value":
                                 sep = emojidata["claims"]["P487"][0]["mainsnak"]["datavalue"]["value"]
             try:
+                if force_lang:
+                    force_lang = force_lang + "|"
                 present_labels = data["entities"][item]["labels"] # All labels for the item
                 priority_languages = (force_lang + languages + "|en").split("|") # Languages for the chat, set by /setlang
                 labellang = random.choice(list(present_labels)) # Choose a random language from the present labels
@@ -123,15 +123,22 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
     elif item[0] == "L": # Is the item a lexeme?
         with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?action=wbgetentities&props=info&format=json&ids=" + item) as url:
             data = json.loads(url.read().decode())
-            labels = []
             try:
                 lemmas = data["entities"][item]["lemmas"]
-                for lang in lemmas:
-                    lemma = data["entities"][item]["lemmas"][lang]["value"]
-                    language = data["entities"][item]["lemmas"][lang]["language"]
-                    label = lemma + " [<code>" + language + "</code>]"
-                    labels.append(label)
-                return sep_override + " " + " / ".join(labels)
+                lexlang = data["entities"][item]["language"]
+                lexlanglink = "<a href='" + wb["baseurl"] + wb["entitypath"] + lexlang + "'>" + labelfetcher(lexlang, languages, wb, sep_override="")[1:] + "</a>"
+                if force_lang and force_lang in lemmas:
+                    lemma = lemmas[force_lang]["value"]
+                    return sep_override + " " + lemma + " [" + lexlanglink + "]"
+                else:
+                    labels = []
+                    lemmalangs = []
+                    for lang in lemmas:
+                        lemma = lemmas[lang]["value"]
+                        language = lemmas[lang]["language"]
+                        labels.append(lemma)
+                        lemmalangs.append(language)
+                    return sep_override + " " + " / ".join(labels) + " [<code>" + "/".join(lemmalangs) + "</code>: " + lexlanglink + "]"
             except:
                 return False
     elif item[0] == "M": # Is the item a media item?
