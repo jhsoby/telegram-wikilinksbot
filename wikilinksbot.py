@@ -498,39 +498,39 @@ def config(update, context):
         if (option not in options) or not inputurl.startswith("http"):
             update.message.reply_html(text=messages["setwiki_error"])
         else:
-            inputurl = re.sub(r"/$", "", inputurl)
-            articlepath = "/wiki/"
             validurlentered = False
-            for wikiurl in [inputurl + articlepath, inputurl + "/", inputurl.rpartition("/")[0] + "/", inputurl.rpartition("=")[0] + "="]:
-                try:
-                    urlblob = "Special:ExpandTemplates?wpInput=(articlepath:{{ARTICLEPATH}})(scriptpath:{{SCRIPTPATH}})"
-                    if "?" in wikiurl:
-                        urlblob = urlblob.replace("?", "&")
-                    with urllib.request.urlopen(wikiurl + urlblob) as url:
-                        rendered = url.read().decode()
-                        pathsfound = re.search(r"id=\"output\".+?\(articlepath:(.+?)\)\(scriptpath:(.+?)?\)", rendered)
-                        wikiurl = "/".join(wikiurl.split("/")[:3])
-                        articlepath = pathsfound.group(1).replace("$1", "")
-                        apipath = pathsfound.group(2) or ""
-                        apipath = ("/" + apipath + "/api.php").replace("//", "/")
-                        linksetting = {"baseurl": wikiurl, "articlepath": articlepath, "apipath": apipath}
-                        if option == "wikibaselinks":
-                            linksetting = {"baseurl": wikiurl, "entitypath": "/entity/", "apipath": apipath}
-                    with open("group_settings.json", "r+") as f:
-                        settings = json.load(f)
-                        if chat_id in settings:
-                            settings[chat_id][option] = linksetting
-                        else:
-                            settings[chat_id] = {option: linksetting}
-                        f.seek(0)
-                        json.dump(settings, f, indent=4)
-                        f.truncate()
-                    validurlentered = True
-                    successtext = messages["setwiki_success"].format(options[option], wikiurl)
-                    update.message.reply_html(text=successtext, disable_web_page_preview=True)
-                    break
-                except:
-                    pass
+            try:
+                with urllib.request.urlopen(inputurl) as url:
+                    rendered = url.read().decode()
+                    find_api = re.search(r"href=\"(.+?/api.php)\?action=rsd\"", rendered).group(1)
+                    if find_api.startswith("//"):
+                        find_api = "https:" + find_api
+                with urllib.request.urlopen(find_api + "?action=query&meta=siteinfo&siprop=general&format=json") as api:
+                    api = json.loads(api.read().decode())["query"]["general"]
+                    domain = api["server"]
+                    if domain.startswith("//"):
+                        domain = "https:" + domain
+                    articlepath = api["articlepath"].replace("$1", "")
+                    apipath = ("/" + api["scriptpath"] + "/api.php").replace("//", "/")
+                    linksetting = {"baseurl": domain, "articlepath": articlepath, "apipath": apipath}
+                    if option == "wikibaselinks":
+                        entitypath = api["wikibase-conceptbaseuri"]
+                        entitypath = "/" + "/".join(entitypath.split("/")[3:])
+                        linksetting = {"baseurl": domain, "entitypath": entitypath, "apipath": apipath}
+                with open("group_settings.json", "r+") as f:
+                    settings = json.load(f)
+                    if chat_id in settings:
+                        settings[chat_id][option] = linksetting
+                    else:
+                        settings[chat_id] = {option: linksetting}
+                    f.seek(0)
+                    json.dump(settings, f, indent=4)
+                    f.truncate()
+                validurlentered = True
+                successtext = messages["setwiki_success"].format(options[option], domain)
+                update.message.reply_html(text=successtext, disable_web_page_preview=True)
+            except:
+                pass
             if not validurlentered:
                 update.message.reply_html(text=messages["setwiki_invalid"], disable_web_page_preview=True)
     elif command == "/toggle" and len(message) >= 3:
