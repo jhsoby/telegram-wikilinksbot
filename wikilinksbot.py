@@ -230,9 +230,6 @@ def resolvetarget(site, link):
                 return [domain, link, True, False]
             else:
                 return [domain, link, True, target]
-        elif "normalized" in api:
-            target = api["normalized"][0]["to"]
-            return [domain, target, True, False]
         elif "interwiki" in api:
             url_from_api = api["interwiki"][0]["url"]
             domainsplit = url_from_api.split("/")
@@ -246,6 +243,9 @@ def resolvetarget(site, link):
                 domain = urlsplit[0]
                 link = link + urlsplit[1]
                 return [domain, link, False, False]
+        elif "normalized" in api:
+            target = api["normalized"][0]["to"]
+            return [domain, target, True, False]
         else:
             return [domain, link, True, False]
 
