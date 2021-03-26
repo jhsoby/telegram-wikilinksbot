@@ -9,7 +9,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)|[QPLEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-x-Q\d+|(-\w{2,4}){0,2}))?|T[1-9]\d*(#[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)?(@\w{2,3}(-x-Q\d+|(-\w{2,4}){0,2}))?|[QPEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
 
 # Load the group settings file once for every time the script is run.
 # If any settings change, global_conf will be set again.
@@ -121,24 +121,56 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
             except:
                 return False
     elif item[0] == "L": # Is the item a lexeme?
-        with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?action=wbgetentities&props=info&format=json&ids=" + item) as url:
+        with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?action=wbgetentities&props=info&format=json&ids=" + item.split("-")[0]) as url:
             data = json.loads(url.read().decode())
             try:
-                lemmas = data["entities"][item]["lemmas"]
-                lexlang = data["entities"][item]["language"]
+                lexlang = data["entities"][item.split("-")[0]]["language"]
                 lexlanglink = "<a href='" + wb["baseurl"] + wb["entitypath"] + lexlang + "'>" + labelfetcher(lexlang, languages, wb, sep_override="")[1:] + "</a>"
-                if force_lang and force_lang in lemmas:
-                    lemma = lemmas[force_lang]["value"]
-                    return sep_override + " " + lemma + " [" + lexlanglink + "]"
+                if re.search(r"-F\d+", item):
+                    forms = data["entities"][item.split("-")[0]]["forms"]
+                    for form in forms:
+                        if form["id"] == item:
+                            if force_lang and force_lang in form["representations"]:
+                                wordform = form["representations"][force_lang]["value"]
+                                return sep_override + " " + wordform + " [" + lexlanglink + "]"
+                            else:
+                                labels = []
+                                formlangs = []
+                                for lang in form["representations"]:
+                                    wordform = form["representations"][lang]["value"]
+                                    language = form["representations"][lang]["language"]
+                                    labels.append(wordform)
+                                    formlangs.append(language)
+                                return sep_override + " " + " / ".join(labels) + " [<code>" + "/".join(formlangs) + "</code>: " + lexlanglink + "]"
+                elif re.search(r"-S\d+", item):
+                    senses = data["entities"][item.split("-")[0]]["senses"]
+                    for sense in senses:
+                        if sense["id"] == item:
+                            if force_lang:
+                                force_lang = force_lang + "|"
+                            priority_languages = (force_lang + languages).split("|")
+                            labellang = random.choice(list(sense["glosses"].keys()))
+                            for lang in priority_languages[::-1]:
+                                if lang in list(sense["glosses"].keys()):
+                                    labellang = lang
+                            label = labelfetcher(item.split("-")[0], languages, wb, sep_override="", force_lang=force_lang)[1:] + ": " + sense["glosses"][labellang]["value"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                            if not labellang == priority_languages[0]:
+                                label += " [<code>" + labellang + "</code>]"
+                            return sep_override + " " + label
                 else:
-                    labels = []
-                    lemmalangs = []
-                    for lang in lemmas:
-                        lemma = lemmas[lang]["value"]
-                        language = lemmas[lang]["language"]
-                        labels.append(lemma)
-                        lemmalangs.append(language)
-                    return sep_override + " " + " / ".join(labels) + " [<code>" + "/".join(lemmalangs) + "</code>: " + lexlanglink + "]"
+                    lemmas = data["entities"][item]["lemmas"]
+                    if force_lang and force_lang in lemmas:
+                        lemma = lemmas[force_lang]["value"]
+                        return sep_override + " " + lemma + " [" + lexlanglink + "]"
+                    else:
+                        labels = []
+                        lemmalangs = []
+                        for lang in lemmas:
+                            lemma = lemmas[lang]["value"]
+                            language = lemmas[lang]["language"]
+                            labels.append(lemma)
+                            lemmalangs.append(language)
+                        return sep_override + " " + " / ".join(labels) + " [<code>" + "/".join(lemmalangs) + "</code>: " + lexlanglink + "]"
             except:
                 return False
     elif item[0] == "M": # Is the item a media item?
@@ -316,21 +348,27 @@ def link_item(link, site, langconf):
         link, section  = link.split("#")
         sectionlabel = True
     elif re.match(r"L\d+-[SF]\d+", link):
+        if "@" in link:
+            link, force_lang = link.split("@")
+            result["force_lang"] = force_lang
         link, section = link.split("-")
         display = link + "-" + section
         target = link + "#" + section
-        sectionlabel = True
     elif re.match(r"T\d+#\d+", link):
         link, section = link.split("#")
-    elif ("@" in link):
+    elif "@" in link:
         link, force_lang = link.split("@")
         display = link
         target = link
         result["force_lang"] = force_lang
-    linklabel = labelfetcher(link, langconf, site, force_lang=force_lang)
+    linklabel = ""
+    if re.match(r"L\d+-[FS]\d+", display):
+        linklabel = labelfetcher(display, langconf, site, force_lang=force_lang)
+    else:
+        linklabel = labelfetcher(link, langconf, site, force_lang=force_lang)
     if sectionlabel:
         sectionlabel = (labelfetcher(section, langconf, site, sep_override=" →") or " → " + section)
-    if section:
+    if section and sectionlabel:
         if linklabel:
             linklabel += sectionlabel
         else:
