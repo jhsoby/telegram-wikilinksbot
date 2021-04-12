@@ -216,6 +216,10 @@ def resolvetarget(site, link):
     redirect target if the page is a redirect.
     """
     target = link
+    section = ""
+    if "#" in link:
+        target, section = link.split("#")
+        section = "#" + section
     domain = site["baseurl"]
     if not len(link):
         return [domain, link, False, False]
@@ -227,9 +231,9 @@ def resolvetarget(site, link):
         if "redirects" in api:
             target = api["redirects"][0]["to"]
             if target == link:
-                return [domain, link, True, False]
+                return [domain, target + section, True, False]
             else:
-                return [domain, link, True, target]
+                return [domain, link, True, target + section]
         elif "interwiki" in api:
             url_from_api = api["interwiki"][0]["url"]
             domainsplit = url_from_api.split("/")
@@ -245,7 +249,7 @@ def resolvetarget(site, link):
                 return [domain, link, False, False]
         elif "normalized" in api:
             target = api["normalized"][0]["to"]
-            return [domain, target, True, False]
+            return [domain, target + section, True, False]
         else:
             return [domain, link, True, False]
 
