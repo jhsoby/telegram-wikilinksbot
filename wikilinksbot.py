@@ -689,7 +689,7 @@ def start(update, context):
 #updater.dispatcher.add_handler(echo_handler)
 
 link_handler = MessageHandler(Filters.regex(regex), findlinks)
-media_link_handler = MessageHandler(Filters.photo & Filters.caption_regex(regex), findlinks)
+media_link_handler = MessageHandler(Filters.caption_regex(regex), findlinks)
 config_handler = CommandHandler(['setwiki', 'setlang', 'toggle', 'listconfig'], config)
 search_handler = CommandHandler('search', search)
 start_handler = CommandHandler(['start', 'help'], start)
