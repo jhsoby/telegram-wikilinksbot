@@ -424,7 +424,8 @@ def findlinks(update, context):
     and entity schemas. It will however _not_ post a link when the entity is
     mentioned as part of a URL.
     """
-    linklist = re.findall(regex, update.message.text) # List all matches with the main regex
+    messagetext = update.message.caption or update.message.text
+    linklist = re.findall(regex, messagetext) # List all matches with the main regex
     fmt_linklist = [] # Formatted link list
     for link in linklist:
         link = link[0].replace("\u200e", "").replace("\u200f", "") # Remove &lrm; and &rlm;, cause links to not link in some (mysterious?) circumstances
@@ -688,12 +689,14 @@ def start(update, context):
 #updater.dispatcher.add_handler(echo_handler)
 
 link_handler = MessageHandler(Filters.regex(regex), findlinks)
+media_link_handler = MessageHandler(Filters.photo & Filters.caption_regex(regex), findlinks)
 config_handler = CommandHandler(['setwiki', 'setlang', 'toggle', 'listconfig'], config)
 search_handler = CommandHandler('search', search)
 start_handler = CommandHandler(['start', 'help'], start)
 delete_handler = CommandHandler('delete', delete)
 
 updater.dispatcher.add_handler(link_handler)
+updater.dispatcher.add_handler(media_link_handler)
 updater.dispatcher.add_handler(config_handler)
 updater.dispatcher.add_handler(search_handler)
 updater.dispatcher.add_handler(start_handler)
