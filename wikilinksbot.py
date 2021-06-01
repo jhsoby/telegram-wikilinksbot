@@ -230,6 +230,8 @@ def resolvetarget(site, link):
         api = json.loads(apiresult.read().decode())["query"]
         if "redirects" in api:
             target = api["redirects"][0]["to"]
+            if "tofragment" in api["redirects"][0]:
+                section = "#" + api["redirects"][0]["tofragment"]
             if target == link:
                 return [domain, target + section, True, False]
             else:
