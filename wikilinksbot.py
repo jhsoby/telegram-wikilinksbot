@@ -405,7 +405,10 @@ def linkformatter(link, conf):
     formatted = "<a href=\"{0[url]}\">{0[display]}</a> {0[extra]}"
     formatted_at = "<a href=\"{0[url]}\">{0[display]}</a><code>@{0[force_lang]}</code> {0[extra]}"
     if (link[0] == "[") and conf["toggle_normallinks"]:
-        return formatted.format(link_normal(link, conf["normallinks"], conf["toggle_mylanguage"]))
+        if conf["toggle_wikibaselinks"] and re.match("^\[\[(Q|P|L|E|Property:P|Lexeme:L|EntitySchema:E)\d+\]\]$", link):
+            return formatted.format(link_item(re.search("[QPLE]\d+", link)[0], conf["wikibaselinks"], conf["language"]))
+        else:
+            return formatted.format(link_normal(link, conf["normallinks"], conf["toggle_mylanguage"]))
     if (link[0] == "{") and conf["toggle_templates"]:
         linkhandler = link_template(link, conf["normallinks"])
         if linkhandler:
