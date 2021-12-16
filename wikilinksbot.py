@@ -180,6 +180,13 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
                 label = data["entities"][item]["title"]
                 return sep_override + " " + label
             except:
+                with urllib.request.urlopen("https://commons.wikimedia.org/w/api.php?action=query&format=json&pageids=" + item[1:]) as url2:
+                    data2 = json.loads(url2.read().decode())
+                    try:
+                        label = data2["query"]["pages"][item[1:]]["title"]
+                        return sep_override + " " + label
+                    except:
+                        return False
                 return False
     elif item[0] == "E": # Is the item an EntitySchema?
         # Should be replaced when EntitySchemas' terms are more
