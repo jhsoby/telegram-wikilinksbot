@@ -9,7 +9,7 @@ import bot_config
 gc.enable()
 updater = Updater(bot_config.token, use_context=True)
 # The main regex we use to find linkable terms in messages
-regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%.])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)?(@\w{2,3}(-x-Q\d+|(-\w{2,4}){0,2}))?|[QPEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
+regex = re.compile(r"(\[\[.+?\]\]|(?<!\{)\{\{(?!\{).+?\}\}|(?<![\w%#.\-])(?<![A-Za-z][=/])(?<!^/)(?<!Property:)(?<!Lexeme:)(?<!EntitySchema:)(?<!Item:)(?<!title=)(L[1-9]\d*(-[SF]\d+)?(@\w{2,3}(-x-Q\d+|(-\w{2,4}){0,2}))?|[QPEM][1-9]\d*(#P[1-9]\d*)?(@\w{2,3}(-\w{2,4}){0,2})?|T[1-9]\d*(#[1-9]\d*)?))")
 
 # Load the group settings file once for every time the script is run.
 # If any settings change, global_conf will be set again.
