@@ -438,13 +438,16 @@ def findlinks(update, context):
     """
     linklist = re.findall(regex, update.message.text) # List all matches with the main regex
     fmt_linklist = [] # Formatted link list
+    hide_preview = True
     for link in linklist:
         link = link[0].replace("\u200e", "").replace("\u200f", "") # Remove &lrm; and &rlm;, cause links to not link in some (mysterious?) circumstances
         link = linkformatter(link, getconfig(update.effective_chat.id))
         if link and (not link in fmt_linklist): # Add the formatted link to the list if it's not already there
             fmt_linklist.append(link)
+    if len(fmt_linklist) == 1 and re.search("(/wiki/File:|/entity/M\d+)", fmt_linklist[0]): # TODO: Hardcoded "File" isn't nice, but better than nothing
+        hide_preview = False
     if len(fmt_linklist) > 0:
-        context.bot.send_message(chat_id=update.effective_chat.id, text="\n".join(fmt_linklist), disable_web_page_preview=True, disable_notification=True, parse_mode="html")
+        context.bot.send_message(chat_id=update.effective_chat.id, text="\n".join(fmt_linklist), disable_web_page_preview=hide_preview, disable_notification=True, parse_mode="html")
 
 def search(update, context):
     """
