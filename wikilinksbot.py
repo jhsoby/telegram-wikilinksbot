@@ -297,7 +297,7 @@ def link_normal(link, site, toggle_mylang=False):
         if toggle_mylang and translatable(site, target):
             target = "Special:MyLanguage/" + target
         domain += site["articlepath"]
-    target = target.replace("\"", "%22").replace("?", "%3F").replace(" ", "_")
+    target = urllib.parse.quote(target.replace(" ", "_"), safe="/#:")
     return {
         "url": domain + target,
         "display": display,
