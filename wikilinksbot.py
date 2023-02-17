@@ -192,6 +192,8 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
         # Should be replaced when EntitySchemas' terms are more
         # readily accessible via the API.
         language = languages.split("|")[0]
+        if force_lang:
+            language = force_lang
         with urllib.request.urlopen(wb["baseurl"] + wb["apipath"] + "?format=json&action=parse&uselang=" + language + "&page=EntitySchema:" + item) as url:
             data = json.loads(url.read().decode())
             try:
