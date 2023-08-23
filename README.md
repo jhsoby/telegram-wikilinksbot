@@ -1,14 +1,16 @@
 # Telegram Wikilinksbot
 
-This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q330574](https://www.wikidata.org/wiki/Q330574), [P31](https://www.wikidata.org/wiki/Property:P31) and [L158582](https://www.wikidata.org/wiki/Lexeme:L158582)) or Wikimedia Phabricator tasks (like [T39625](https://phabricator.wikimedia.org/T39625)) whenever they're used in chats.
+This is a Python3 script that links [[wiki links]], Wikidata entities (like [Q330574](https://www.wikidata.org/wiki/Q330574), [P31](https://www.wikidata.org/wiki/Property:P31) and [L158582](https://www.wikidata.org/wiki/Lexeme:L158582)), Wikimedia Commons media entities (like [M1905684](https://commons.wikimedia.org/entity/M1905684)), Wikifunctions objects (like [Z10123](https://www.wikifunctions.org/view/en/Z10123)), and Wikimedia Phabricator tasks (like [T39625](https://phabricator.wikimedia.org/T39625)) whenever they're used in chats.
 
 ## Features
 * Links [[wiki links]] and {{templates}} mentioned in chat messages
   * Links to redirects link directly to the target pages and show their titles
   * Interwiki links link directly to the correct target sites
-* Links Wikidata entities mentioned in chat messages
+* Links Wikidata (or other Wikibase) entities mentioned in chat messages
   * You can also link specific properties in an entity, or to specific
   lexeme forms or senses
+* Links Wikimedia Commons media entities mentioned in chat messages
+* Links Wikifunctions objects mentioned in chat messages
 * Links Phabricator tasks mentioned in chat messages
 * The bot can delete its own messages when they are replied to with `/delete`
   * It will also try to delete the message with the `/delete` command, but this
@@ -81,7 +83,7 @@ Set the label language order to Norwegian Bokmål, Norwegian Nynorsk, Swedish an
 
 #### Toggle link types
 ```
-/toggle (normallinks|wikibaselinks|phabricator|mylanguage|templates) (on|off)
+/toggle (normallinks|wikibaselinks|wikilambdalinks|phabricator|mylanguage|templates) (on|off)
 ```
 
 This command is used to turn one of the link types on or off. If all link types are turned off, the bot is essentially disabled. By default, all are turned on.
