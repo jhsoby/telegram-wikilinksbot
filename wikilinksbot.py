@@ -276,10 +276,13 @@ def resolvetarget(site, link):
 	if link[0] == ":":
 		link = link[1:]
 	linksplit = link.split(":")
-	with urllib.request.urlopen(site["baseurl"] + site["apipath"] + "?format=json&action=query&iwurl=1&redirects=1&titles=" + urllib.parse.quote(link)) as apiresult:
+	with urllib.request.urlopen(site["baseurl"] + site["apipath"] + "?format=json&action=query&iwurl=1&redirects=1&meta=userinfo&titles=" + urllib.parse.quote(link)) as apiresult:
 		api = json.loads(apiresult.read().decode())["query"]
+		myusername = api["userinfo"]["name"]
 		if "redirects" in api:
 			target = api["redirects"][0]["to"]
+			if myusername in target and myusername not in link:
+				target = api["redirects"][0]["from"]
 			if "tofragment" in api["redirects"][0]:
 				section = "#" + api["redirects"][0]["tofragment"]
 			if target == link:
