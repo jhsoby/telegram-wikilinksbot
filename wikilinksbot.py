@@ -236,7 +236,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
 							label_index = this_index
 							labelz = labelobj
 							labellangz = labelobj["Z11K1"]
-				label = labelz["Z11K2"]
+				label = labelz["Z11K2"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 				if not labellangz == priority_languages_post[0]:
 					labellang = list(wflangmap.keys())[list(wflangmap.values()).index(labellangz)]
 					label += " [<code>" + labellang + "</code>]"
