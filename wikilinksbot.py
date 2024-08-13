@@ -109,7 +109,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
 				if force_lang:
 					force_lang = force_lang + "|"
 				present_labels = data["entities"][item]["labels"] # All labels for the item
-				priority_languages = (force_lang + languages + "|en").split("|") # Languages for the chat, set by /setlang
+				priority_languages = (force_lang + languages + "|mul|en").split("|") # Languages for the chat, set by /setlang
 				labellang = random.choice(list(present_labels)) # Choose a random language from the present labels
 				for lang in priority_languages[::-1]: # Go through the list of priority languages from the back, and set whatever language that has a label as the label instead of the randomly chosen one
 					if lang in present_labels:
@@ -221,7 +221,7 @@ def labelfetcher(item, languages, wb, sep_override="–", force_lang=""):
 				present_labels.remove("Z11")
 				labelz = random.choice(present_labels)
 				labellangz = labelz["Z11K1"]
-				priority_languages_pre = (languages + "|en").split("|")
+				priority_languages_pre = (languages + "|mul|en").split("|")
 				priority_languages_post = []
 				for lang in priority_languages_pre:
 					if lang in wflangmap:
@@ -668,7 +668,7 @@ def config(update, context):
 		else:
 			update.message.reply_text(text=messages["toggle_error"], parse_mode="html")
 	elif command == "/setlang" and len(message) >= 2:
-		languages = message[1] + "|en"
+		languages = message[1] + "|mul|en"
 		error = False
 		for lang in languages.split("|"):
 			if not re.match(r"^([a-z]{2,3}(-[a-z]+)*?|es-419)$", lang):
