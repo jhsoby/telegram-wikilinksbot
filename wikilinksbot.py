@@ -376,7 +376,7 @@ def link_template(link, site):
 	elif targetsplit[0] == "subst":
 		target = "Template:" + "".join(targetsplit[1:])
 	elif targetsplit[0] == "int":
-		target = "MediaWiki:" + "".join(targetsplit[1:])
+		target = "Special:MyLanguage/MediaWiki:" + "".join(targetsplit[1:])
 	elif ("#" in target) or (targetsplit[0] in varfuncs):
 		return False
 	elif ((targetsplit[0].lower() in namespaces) and (len(targetsplit) > 1)) or (target[0] == ":"):
