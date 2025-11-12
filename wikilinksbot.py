@@ -376,7 +376,7 @@ def link_template(link, site):
 	elif targetsplit[0] == "subst":
 		target = "Template:" + "".join(targetsplit[1:])
 	elif targetsplit[0] == "int":
-		target = "Special:MyLanguage/MediaWiki:" + "".join(targetsplit[1:])
+		target = "MediaWiki:" + "".join(targetsplit[1:])
 	elif ("#" in target) or (targetsplit[0] in varfuncs):
 		return False
 	elif ((targetsplit[0].lower() in namespaces) and (len(targetsplit) > 1)) or (target[0] == ":"):
@@ -389,6 +389,8 @@ def link_template(link, site):
 	if redirect:
 		target = redirect
 		extra = "⮡ " + redirect
+	if targetsplit[0] == "int":
+		target = "Special:MyLanguage/" + target
 	target = target.replace("\"", "%22").replace("?", "%3F").replace(" ", "_")
 	return {
 		"url": site["baseurl"] + site["articlepath"] + target,
